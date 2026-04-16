@@ -1,177 +1,56 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PF2E Character Generator</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: system-ui, sans-serif; background: #f4f3ef; color: #1a1a1a; min-height: 100vh; padding: 2rem 1rem; }
-  .container { max-width: 500px; margin: 0 auto; }
-  h1 { font-size: 24px; font-weight: 600; margin-bottom: 4px; }
-  .subtitle { font-size: 14px; color: #666; margin-bottom: 1.5rem; }
-  .btn { background: #1a1a1a; color: #fff; border: none; border-radius: 8px; padding: 12px 24px; font-size: 15px; font-weight: 500; cursor: pointer; width: 100%; margin-bottom: 1.5rem; font-family: inherit; }
-  .btn:hover { background: #333; }
-  .btn:active { transform: scale(0.99); }
-  .card { background: #fff; border: 1px solid #e0ddd6; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; }
-  .char-name { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
-  .char-tagline { font-size: 14px; color: #666; margin-bottom: 1rem; }
-  .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 1rem; }
-  .badge { font-size: 12px; padding: 3px 10px; border-radius: 99px; font-weight: 500; }
-  .badge-common { background: #EAF3DE; color: #3B6D11; }
-  .badge-uncommon { background: #FAEEDA; color: #854F0B; }
-  .badge-rare { background: #E6F1FB; color: #185FA5; }
-  .divider { border: none; border-top: 1px solid #f0ede6; margin: 12px 0; }
-  .section-title { font-size: 11px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .field-label { display: block; font-size: 11px; color: #999; margin-bottom: 2px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
-  .field-value { font-size: 15px; color: #1a1a1a; font-weight: 500; }
-  .field-sub { display: block; font-size: 12px; color: #888; }
-  .regen-btn { background: transparent; border: 1px solid #ccc; border-radius: 8px; padding: 7px 16px; font-size: 13px; color: #555; cursor: pointer; font-family: inherit; margin-top: 12px; }
-  .regen-btn:hover { background: #f4f3ef; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PF2E Random Character Generator</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<div class="container">
-  <h1>PF2E Character Generator</h1>
-  <p class="subtitle">Pathfinder 2nd Edition · Fully random</p>
-  <button class="btn" onclick="generate()">Generate character</button>
-  <div id="output"></div>
-</div>
+  <main class="container">
+    <h1>PF2E Random Character Generator</h1>
+    <p class="subtitle">Generate a random ancestry, heritage, background, class, and subclass setup.</p>
 
-<script>
-const DATA = {
-  ancestries: [
-    { name: "Human",    rarity: "common",   heritages: ["Skilled", "Versatile", "Wintertouched"] },
-    { name: "Elf",      rarity: "common",   heritages: ["Ancient Elf", "Cavern Elf", "Desert Elf", "Seer Elf", "Whisper Elf", "Woodland Elf"] },
-    { name: "Dwarf",    rarity: "common",   heritages: ["Ancient-Blooded", "Death Warden", "Forge", "Rock", "Strong-Blooded"] },
-    { name: "Gnome",    rarity: "common",   heritages: ["Chameleon", "Fey-Touched", "Sensate", "Umbral", "Wellspring"] },
-    { name: "Halfling", rarity: "common",   heritages: ["Gutsy", "Hillock", "Jinxed", "Nomadic", "Observant", "Twilight", "Wildwood"] },
-    { name: "Goblin",   rarity: "common",   heritages: ["Charhide", "Irongut", "Razortooth", "Snow", "Unbreakable"] },
-    { name: "Leshy",    rarity: "uncommon", heritages: ["Fungus", "Gourd", "Leaf", "Vine"] },
-    { name: "Catfolk",  rarity: "uncommon", heritages: ["Clawsent", "Hunting", "Jungle", "Nine Lives", "Sharp-Eared"] },
-    { name: "Kobold",   rarity: "uncommon", heritages: ["Cavern", "Dragonscaled", "Spellscale", "Strongjaw", "Venomtail"] },
-    { name: "Orc",      rarity: "uncommon", heritages: ["Badlands", "Battle-Ready", "Deep", "Rainfall", "Winterborn"] },
-    { name: "Fetchling",rarity: "rare",     heritages: ["Brightbred", "Liminal", "Shaded", "Wispy"] },
-    { name: "Gnoll",    rarity: "rare",     heritages: ["Sweetbreath", "Treedweller", "Witch-Marked"] },
-  ],
-  backgrounds: [
-    { name: "Acolyte",          rarity: "common" },
-    { name: "Acrobat",          rarity: "common" },
-    { name: "Animal Whisperer", rarity: "common" },
-    { name: "Artisan",          rarity: "common" },
-    { name: "Artist",           rarity: "common" },
-    { name: "Barkeep",          rarity: "common" },
-    { name: "Farmhand",         rarity: "common" },
-    { name: "Guard",            rarity: "common" },
-    { name: "Herbalist",        rarity: "common" },
-    { name: "Hunter",           rarity: "common" },
-    { name: "Merchant",         rarity: "common" },
-    { name: "Scholar",          rarity: "common" },
-    { name: "Street Urchin",    rarity: "common" },
-    { name: "Sailor",           rarity: "common" },
-    { name: "Gladiator",        rarity: "uncommon" },
-    { name: "Noble",            rarity: "uncommon" },
-    { name: "Insurgent",        rarity: "uncommon" },
-    { name: "Cultist",          rarity: "rare" },
-    { name: "Haunted",          rarity: "rare" },
-  ],
-  classes: [
-    { name: "Barbarian",    rarity: "common" },
-    { name: "Bard",         rarity: "common" },
-    { name: "Champion",     rarity: "common" },
-    { name: "Cleric",       rarity: "common" },
-    { name: "Druid",        rarity: "common" },
-    { name: "Fighter",      rarity: "common" },
-    { name: "Monk",         rarity: "common" },
-    { name: "Ranger",       rarity: "common" },
-    { name: "Rogue",        rarity: "common" },
-    { name: "Sorcerer",     rarity: "common" },
-    { name: "Wizard",       rarity: "common" },
-    { name: "Investigator", rarity: "uncommon" },
-    { name: "Oracle",       rarity: "uncommon" },
-    { name: "Swashbuckler", rarity: "uncommon" },
-    { name: "Witch",        rarity: "uncommon" },
-    { name: "Psychic",      rarity: "rare" },
-    { name: "Thaumaturge",  rarity: "rare" },
-  ],
-  firstNames: {
-    Human:    ["Aldric", "Sera", "Torben", "Lysa", "Caius", "Mira", "Edran", "Nessa"],
-    Elf:      ["Aelindra", "Sorvaeth", "Caladwen", "Ithilior", "Niriel", "Thalindor"],
-    Dwarf:    ["Dolgrin", "Hurnak", "Tordak", "Brimla", "Gorra", "Valdris"],
-    Gnome:    ["Betti", "Zibble", "Fizzwhistle", "Nox", "Quirble", "Tindal"],
-    Halfling: ["Andry", "Corbin", "Liria", "Milo", "Pip", "Roswyn"],
-    Goblin:   ["Zark", "Nibble", "Skrix", "Vex", "Yark", "Snag"],
-    Leshy:    ["Mosswillow", "Fernwhisper", "Rootvine", "Thistledown"],
-    Catfolk:  ["Shurri", "Rhaskar", "Mikhai", "Zafira", "Soriel"],
-    Kobold:   ["Azzik", "Nakk", "Snarl", "Rix", "Zix"],
-    Orc:      ["Grugnak", "Torva", "Ulkris", "Brekka", "Skora"],
-    Fetchling:["Shade", "Umbra", "Vex", "Nox", "Dusk"],
-    Gnoll:    ["Karak", "Yenra", "Hrask", "Voran"],
-  },
-  lastNames: ["Ironforge", "Swiftwind", "Grimholt", "Dawnbringer", "Ashenvale", "Stormcrest", "Coldwater", "Brightwood", "Shadowmere", "Thornwall"],
-};
+    <p id="statusMessage" class="status-message" aria-live="polite">Loading character data...</p>
 
-function rarityWeight(r) {
-  return r === "common" ? 60 : r === "uncommon" ? 30 : 10;
-}
-
-function weightedRandom(arr) {
-  const total = arr.reduce((s, i) => s + rarityWeight(i.rarity), 0);
-  let r = Math.random() * total;
-  for (const item of arr) {
-    r -= rarityWeight(item.rarity);
-    if (r <= 0) return item;
-  }
-  return arr[arr.length - 1];
-}
-
-function pick(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-function badgeClass(r) {
-  return r === "common" ? "badge-common" : r === "uncommon" ? "badge-uncommon" : "badge-rare";
-}
-
-function generate() {
-  const ancestry   = weightedRandom(DATA.ancestries);
-  const heritage   = pick(ancestry.heritages);
-  const background = weightedRandom(DATA.backgrounds);
-  const cls        = weightedRandom(DATA.classes);
-  const firstName  = pick(DATA.firstNames[ancestry.name] || DATA.firstNames["Human"]);
-  const lastName   = pick(DATA.lastNames);
-
-  document.getElementById('output').innerHTML = `
-    <div class="card">
-      <div class="char-name">${firstName} ${lastName}</div>
-      <div class="char-tagline">${ancestry.name} ${cls.name}</div>
-      <div class="badges">
-        <span class="badge ${badgeClass(ancestry.rarity)}">${ancestry.rarity}</span>
-      </div>
-      <hr class="divider">
-      <div class="section-title">Character details</div>
-      <div class="grid2">
-        <div>
-          <span class="field-label">Ancestry</span>
-          <span class="field-value">${ancestry.name}</span>
-          <span class="field-sub">${heritage} heritage</span>
-        </div>
-        <div>
-          <span class="field-label">Background</span>
-          <span class="field-value">${background.name}</span>
-          <span class="field-sub">${background.rarity}</span>
-        </div>
-        <div>
-          <span class="field-label">Class</span>
-          <span class="field-value">${cls.name}</span>
-          <span class="field-sub">${cls.rarity}</span>
-        </div>
-      </div>
-      <button class="regen-btn" onclick="generate()">Generate another</button>
+    <div class="button-row">
+      <button id="generateBtn" disabled>Generate Character</button>
+      <button id="retryBtn" class="secondary-button" type="button" hidden>Try Again</button>
     </div>
-  `;
-}
-</script>
+
+    <section class="result-card">
+      <div class="result-row">
+        <span class="label">Ancestry</span>
+        <span id="ancestryResult" class="value">-</span>
+      </div>
+
+      <div class="result-row">
+        <span class="label">Heritage</span>
+        <span id="heritageResult" class="value">-</span>
+      </div>
+
+      <div class="result-row">
+        <span class="label">Background</span>
+        <span id="backgroundResult" class="value">-</span>
+      </div>
+
+      <div class="result-row">
+        <span class="label">Class</span>
+        <span id="classResult" class="value">-</span>
+      </div>
+
+      <div class="result-row">
+        <span class="label">Key Ability</span>
+        <span id="keyAbilityResult" class="value">-</span>
+      </div>
+
+      <div class="result-block">
+        <span class="label">Subclasses</span>
+        <div id="subclassResult" class="subclass-list">-</div>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
 </body>
 </html>
