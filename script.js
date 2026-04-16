@@ -24,11 +24,45 @@ let heritages = [];
 let backgrounds = [];
 let classes = [];
 let subclasses = [];
+let currentCharacter = null;
+
+const lockedSelections = {
+  ancestry: null,
+  heritage: null,
+  background: null,
+  class: null,
+  keyAbility: null,
+  subclasses: null,
+};
 
 const generateButton = document.getElementById("generateBtn");
 const retryButton = document.getElementById("retryBtn");
+const rarityFilterSelect = document.getElementById("rarityFilter");
+const rarityModeGroup = document.getElementById("rarityModeGroup");
 const rarityModeSelect = document.getElementById("rarityMode");
+const accessFilterSelect = document.getElementById("accessFilter");
 const statusMessage = document.getElementById("statusMessage");
+const lockButtons = {
+  ancestry: document.getElementById("lockAncestryBtn"),
+  heritage: document.getElementById("lockHeritageBtn"),
+  background: document.getElementById("lockBackgroundBtn"),
+  class: document.getElementById("lockClassBtn"),
+  keyAbility: document.getElementById("lockKeyAbilityBtn"),
+  subclasses: document.getElementById("lockSubclassesBtn"),
+};
+
+const rarityModeOptions = {
+  all: [
+    { value: "strong", label: "Common Favored (Common 10, Uncommon 3, Rare 1)" },
+    { value: "light", label: "Balanced (Common 4, Uncommon 3, Rare 2)" },
+    { value: "off", label: "Pure Random (All rarities 1)" },
+  ],
+  "common-uncommon": [
+    { value: "strong", label: "Common Favored (Common 6, Uncommon 3)" },
+    { value: "light", label: "Balanced (Common 4, Uncommon 3)" },
+    { value: "off", label: "Pure Random (Common 1, Uncommon 1)" },
+  ],
+};
 
 // ===============================
 // HELPER FUNCTIONS
@@ -43,9 +77,140 @@ function randomItems(array, count) {
   return shuffled.slice(0, count);
 }
 
+function cloneValue(value) {
+  if (Array.isArray(value)) {
+    return value.map(item => ({ ...item }));
+  }
+
+  if (value && typeof value === "object") {
+    return { ...value };
+  }
+
+  return value;
+}
+
+function normalizeRarity(item) {
+  return String(item.rarity || "common").toLowerCase().trim();
+}
+
+function getAllowedRarities() {
+  const rarityFilter = rarityFilterSelect.value;
+
+  if (rarityFilter === "common-only") {
+    return ["common"];
+  }
+
+  if (rarityFilter === "common-uncommon") {
+    return ["common", "uncommon"];
+  }
+
+  return ["common", "uncommon", "rare"];
+}
+
+function filterByAllowedRarities(array) {
+  const allowedRarities = getAllowedRarities();
+  return array.filter(item => allowedRarities.includes(normalizeRarity(item)));
+}
+
+function normalizeAccess(item) {
+  return String(item.access || "").toLowerCase().trim();
+}
+
+function filterByAccess(array) {
+  const accessFilter = accessFilterSelect.value;
+
+  if (accessFilter === "all") {
+    return array;
+  }
+
+  return array.filter(item => {
+    const access = normalizeAccess(item);
+
+    if (accessFilter === "hide-restricted") {
+      return access !== "society restricted";
+    }
+
+    return access !== "society limited" && access !== "society restricted";
+  });
+}
+
+function applyActiveFilters(array) {
+  return filterByAccess(filterByAllowedRarities(array));
+}
+
+function findAncestryByName(name) {
+  return ancestries.find(
+    ancestry => ancestry.name.toLowerCase() === String(name).toLowerCase()
+  ) || null;
+}
+
+function findClassByName(name) {
+  return classes.find(
+    characterClass => characterClass.name.toLowerCase() === String(name).toLowerCase()
+  ) || null;
+}
+
+function updateLockButtons() {
+  Object.entries(lockButtons).forEach(([key, button]) => {
+    const isLocked = lockedSelections[key] !== null;
+    button.textContent = isLocked ? "Unlock" : "Lock";
+    button.classList.toggle("locked", isLocked);
+    button.setAttribute("aria-pressed", String(isLocked));
+  });
+}
+
+function toggleLock(key) {
+  if (lockedSelections[key] !== null) {
+    lockedSelections[key] = null;
+    updateLockButtons();
+    return;
+  }
+
+  if (!currentCharacter) {
+    return;
+  }
+
+  const currentValue = currentCharacter[key];
+
+  if (currentValue === null || currentValue === undefined) {
+    return;
+  }
+
+  lockedSelections[key] = cloneValue(currentValue);
+  updateLockButtons();
+}
+
+function updateRarityModeControl() {
+  const rarityFilter = rarityFilterSelect.value;
+  const currentMode = rarityModeSelect.value;
+
+  if (rarityFilter === "common-only") {
+    rarityModeGroup.hidden = true;
+    rarityModeSelect.disabled = true;
+    return;
+  }
+
+  const optionSet = rarityModeOptions[rarityFilter] || rarityModeOptions.all;
+
+  rarityModeGroup.hidden = false;
+  rarityModeSelect.disabled = false;
+  rarityModeSelect.replaceChildren();
+
+  optionSet.forEach(option => {
+    const optionElement = document.createElement("option");
+    optionElement.value = option.value;
+    optionElement.textContent = option.label;
+    rarityModeSelect.appendChild(optionElement);
+  });
+
+  rarityModeSelect.value = optionSet.some(option => option.value === currentMode)
+    ? currentMode
+    : optionSet[0].value;
+}
+
 function rarityWeight(item) {
   const rarityMode = rarityModeSelect.value;
-  const rarity = String(item.rarity || "common").toLowerCase().trim();
+  const rarity = normalizeRarity(item);
 
   if (rarityMode === "off") {
     return 1;
@@ -71,7 +236,7 @@ function rarityWeight(item) {
     return 3;
   }
 
-  return 6;
+  return 10;
 }
 
 function weightedRandomItem(array) {
@@ -422,31 +587,86 @@ function generateCharacter() {
     return;
   }
 
+  const availableAncestries = applyActiveFilters(ancestries);
+  const availableBackgrounds = applyActiveFilters(backgrounds);
+  const availableClasses = applyActiveFilters(classes);
+
+  if (
+    availableAncestries.length === 0 ||
+    availableBackgrounds.length === 0 ||
+    availableClasses.length === 0
+  ) {
+    statusMessage.textContent =
+      "No options match the current filters. Try allowing more rarities or access entries.";
+    statusMessage.classList.add("error");
+    return;
+  }
+
+  statusMessage.textContent = "Character data loaded. You can generate a character now.";
+  statusMessage.classList.remove("error");
+
+  let ancestry = lockedSelections.ancestry;
+  let heritage = lockedSelections.heritage;
+  let background = lockedSelections.background;
+  let chosenClass = lockedSelections.class;
+  let chosenSubclasses = lockedSelections.subclasses;
+  let chosenKeyAbility = lockedSelections.keyAbility;
+
+  if (!ancestry && heritage) {
+    ancestry = findAncestryByName(heritage.ancestry) || { name: heritage.ancestry };
+  }
+
+  if (!chosenClass && chosenSubclasses && chosenSubclasses.length > 0) {
+    chosenClass =
+      findClassByName(chosenSubclasses[0].class) || { name: chosenSubclasses[0].class };
+  }
+
   // Pick ancestry
-  const ancestry = weightedRandomItem(ancestries);
+  if (!ancestry) {
+    ancestry = weightedRandomItem(availableAncestries);
+  }
 
   // Pick matching heritage
-  const matchingHeritages = heritages.filter(
-    heritage => heritage.ancestry.toLowerCase() === ancestry.name.toLowerCase()
+  const matchingHeritages = applyActiveFilters(heritages).filter(
+    heritageOption => heritageOption.ancestry.toLowerCase() === ancestry.name.toLowerCase()
   );
-  const heritage = matchingHeritages.length > 0
-    ? weightedRandomItem(matchingHeritages)
-    : null;
+  if (!heritage) {
+    heritage = matchingHeritages.length > 0
+      ? weightedRandomItem(matchingHeritages)
+      : null;
+  }
 
   // Pick background
-  const background = weightedRandomItem(backgrounds);
+  if (!background) {
+    background = weightedRandomItem(availableBackgrounds);
+  }
 
   // Pick class
-  const chosenClass = weightedRandomItem(classes);
+  if (!chosenClass) {
+    chosenClass = weightedRandomItem(availableClasses);
+  }
 
   // Pick subclass/subclasses
-  const matchingSubclasses = subclasses.filter(
+  const matchingSubclasses = applyActiveFilters(subclasses).filter(
     subclass => subclass.class.toLowerCase() === chosenClass.name.toLowerCase()
   );
-  const chosenSubclasses = chooseSubclassesForClass(chosenClass.name, matchingSubclasses);
+  if (!chosenSubclasses) {
+    chosenSubclasses = chooseSubclassesForClass(chosenClass.name, matchingSubclasses);
+  }
 
   // Pick final key ability
-  const chosenKeyAbility = chooseKeyAbility(chosenClass, chosenSubclasses);
+  if (!chosenKeyAbility) {
+    chosenKeyAbility = chooseKeyAbility(chosenClass, chosenSubclasses);
+  }
+
+  currentCharacter = {
+    ancestry: cloneValue(ancestry),
+    heritage: cloneValue(heritage),
+    background: cloneValue(background),
+    class: cloneValue(chosenClass),
+    keyAbility: cloneValue(chosenKeyAbility),
+    subclasses: cloneValue(chosenSubclasses),
+  };
 
   // Display simple results
   document.getElementById("ancestryResult").textContent = ancestry.name;
@@ -482,4 +702,13 @@ function generateCharacter() {
 
 generateButton.addEventListener("click", generateCharacter);
 retryButton.addEventListener("click", loadData);
+rarityFilterSelect.addEventListener("change", updateRarityModeControl);
+lockButtons.ancestry.addEventListener("click", () => toggleLock("ancestry"));
+lockButtons.heritage.addEventListener("click", () => toggleLock("heritage"));
+lockButtons.background.addEventListener("click", () => toggleLock("background"));
+lockButtons.class.addEventListener("click", () => toggleLock("class"));
+lockButtons.keyAbility.addEventListener("click", () => toggleLock("keyAbility"));
+lockButtons.subclasses.addEventListener("click", () => toggleLock("subclasses"));
+updateLockButtons();
+updateRarityModeControl();
 loadData();

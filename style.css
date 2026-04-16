@@ -31,13 +31,19 @@ h1 {
   color: #9f1d1d;
 }
 
+.controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
 .control-group {
+  flex: 1 1 320px;
   margin-bottom: 16px;
 }
 
 .control-input {
   width: 100%;
-  max-width: 320px;
   padding: 10px 12px;
   font: inherit;
   border: 1px solid #bbb;
@@ -94,11 +100,41 @@ button:disabled {
   margin-bottom: 16px;
 }
 
+.result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .label {
   display: block;
   font-weight: bold;
   margin-bottom: 6px;
   color: #444;
+}
+
+.lock-button {
+  padding: 6px 12px;
+  font-size: 14px;
+  background: white;
+  color: #333;
+  border: 1px solid #bbb;
+  border-radius: 999px;
+}
+
+.lock-button:hover {
+  background: #f7f7f7;
+}
+
+.lock-button.locked {
+  background: #333;
+  color: white;
+  border-color: #333;
+}
+
+.lock-button.locked:hover {
+  background: #555;
 }
 
 .value {
