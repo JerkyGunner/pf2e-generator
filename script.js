@@ -27,6 +27,7 @@ let subclasses = [];
 
 const generateButton = document.getElementById("generateBtn");
 const retryButton = document.getElementById("retryBtn");
+const rarityModeSelect = document.getElementById("rarityMode");
 const statusMessage = document.getElementById("statusMessage");
 
 // ===============================
@@ -40,6 +41,80 @@ function randomItem(array) {
 function randomItems(array, count) {
   const shuffled = [...array].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);
+}
+
+function rarityWeight(item) {
+  const rarityMode = rarityModeSelect.value;
+  const rarity = String(item.rarity || "common").toLowerCase().trim();
+
+  if (rarityMode === "off") {
+    return 1;
+  }
+
+  if (rarityMode === "light") {
+    if (rarity === "rare") {
+      return 2;
+    }
+
+    if (rarity === "uncommon") {
+      return 3;
+    }
+
+    return 4;
+  }
+
+  if (rarity === "rare") {
+    return 1;
+  }
+
+  if (rarity === "uncommon") {
+    return 3;
+  }
+
+  return 6;
+}
+
+function weightedRandomItem(array) {
+  if (array.length === 0) {
+    return null;
+  }
+
+  const totalWeight = array.reduce(
+    (sum, item) => sum + rarityWeight(item),
+    0
+  );
+
+  let remainingWeight = Math.random() * totalWeight;
+
+  for (const item of array) {
+    remainingWeight -= rarityWeight(item);
+
+    if (remainingWeight < 0) {
+      return item;
+    }
+  }
+
+  return array[array.length - 1];
+}
+
+function weightedRandomItems(array, count) {
+  const pool = [...array];
+  const results = [];
+
+  while (pool.length > 0 && results.length < count) {
+    const chosenItem = weightedRandomItem(pool);
+
+    if (!chosenItem) {
+      break;
+    }
+
+    results.push(chosenItem);
+
+    const chosenIndex = pool.indexOf(chosenItem);
+    pool.splice(chosenIndex, 1);
+  }
+
+  return results;
 }
 
 function parseCsv(csvText) {
@@ -186,7 +261,8 @@ function chooseStandardSubclasses(matchingSubclasses) {
 
   return Object.keys(subclassesByType)
     .sort((a, b) => Number(a) - Number(b))
-    .map(type => randomItem(subclassesByType[type]));
+    .map(type => weightedRandomItem(subclassesByType[type]))
+    .filter(subclass => subclass !== null);
 }
 
 function chooseKineticistSubclasses(matchingSubclasses) {
@@ -202,18 +278,18 @@ function chooseKineticistSubclasses(matchingSubclasses) {
     return [];
   }
 
-  const gateChoice = randomItem(type1Options);
+  const gateChoice = weightedRandomItem(type1Options);
   const results = [gateChoice];
 
   const gateName = gateChoice.name.toLowerCase().trim();
 
   if (gateName === "single gate") {
     if (type2Options.length > 0) {
-      results.push(randomItem(type2Options));
+      results.push(weightedRandomItem(type2Options));
     }
   } else if (gateName === "dual gate") {
     if (type2Options.length >= 2) {
-      results.push(...randomItems(type2Options, 2));
+      results.push(...weightedRandomItems(type2Options, 2));
     } else if (type2Options.length === 1) {
       results.push(type2Options[0]);
     }
@@ -232,16 +308,16 @@ function chooseExemplarSubclasses(matchingSubclasses) {
   }
 
   if (weaponIkons.length === 0) {
-    return randomItems(matchingSubclasses, 3);
+    return weightedRandomItems(matchingSubclasses, 3);
   }
 
-  const chosenWeapon = randomItem(weaponIkons);
+  const chosenWeapon = weightedRandomItem(weaponIkons);
 
   const remainingPool = matchingSubclasses.filter(
     subclass => subclass.name !== chosenWeapon.name
   );
 
-  const additionalChoices = randomItems(remainingPool, 2);
+  const additionalChoices = weightedRandomItems(remainingPool, 2);
 
   return [chosenWeapon, ...additionalChoices];
 }
@@ -347,19 +423,21 @@ function generateCharacter() {
   }
 
   // Pick ancestry
-  const ancestry = randomItem(ancestries);
+  const ancestry = weightedRandomItem(ancestries);
 
   // Pick matching heritage
   const matchingHeritages = heritages.filter(
     heritage => heritage.ancestry.toLowerCase() === ancestry.name.toLowerCase()
   );
-  const heritage = matchingHeritages.length > 0 ? randomItem(matchingHeritages) : null;
+  const heritage = matchingHeritages.length > 0
+    ? weightedRandomItem(matchingHeritages)
+    : null;
 
   // Pick background
-  const background = randomItem(backgrounds);
+  const background = weightedRandomItem(backgrounds);
 
   // Pick class
-  const chosenClass = randomItem(classes);
+  const chosenClass = weightedRandomItem(classes);
 
   // Pick subclass/subclasses
   const matchingSubclasses = subclasses.filter(

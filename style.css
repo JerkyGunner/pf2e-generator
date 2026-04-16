@@ -31,6 +31,21 @@ h1 {
   color: #9f1d1d;
 }
 
+.control-group {
+  margin-bottom: 16px;
+}
+
+.control-input {
+  width: 100%;
+  max-width: 320px;
+  padding: 10px 12px;
+  font: inherit;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  background: white;
+  color: #222;
+}
+
 .button-row {
   display: flex;
   flex-wrap: wrap;

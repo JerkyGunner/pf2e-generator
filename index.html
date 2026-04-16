@@ -11,6 +11,15 @@
     <h1>PF2E Random Character Generator</h1>
     <p class="subtitle">Generate a random ancestry, heritage, background, class, and subclass setup.</p>
 
+    <div class="control-group">
+      <label for="rarityMode" class="label">Rarity Weighting</label>
+      <select id="rarityMode" class="control-input">
+        <option value="strong" selected>Common Favored (Common 6, Uncommon 3, Rare 1)</option>
+        <option value="light">Balanced (Common 4, Uncommon 3, Rare 2)</option>
+        <option value="off">Pure Random (All rarities 1)</option>
+      </select>
+    </div>
+
     <p id="statusMessage" class="status-message" aria-live="polite">Loading character data...</p>
 
     <div class="button-row">
