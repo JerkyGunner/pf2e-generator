@@ -85,67 +85,73 @@
     </div>
 
     <section class="result-card">
-      <div class="result-row">
-        <div class="result-header">
-          <span class="label">Ancestry</span>
-          <button id="lockAncestryBtn" class="lock-button" type="button">Lock</button>
-        </div>
-        <div class="value-row">
-          <span id="ancestryResult" class="value">-</span>
-          <span id="ancestrySource" class="source-slot"></span>
-        </div>
-      </div>
+      <div class="result-grid">
+        <div class="result-column">
+          <div class="result-row result-row-accent result-row-accent-ancestry">
+            <div class="result-header">
+              <span class="label">Ancestry</span>
+              <button id="lockAncestryBtn" class="lock-button" type="button">Lock</button>
+            </div>
+            <div class="value-row">
+              <span id="ancestryResult" class="value">-</span>
+              <span id="ancestrySource" class="source-slot"></span>
+            </div>
+          </div>
 
-      <div class="result-row">
-        <div class="result-header">
-          <span class="label">Heritage</span>
-          <button id="lockHeritageBtn" class="lock-button" type="button">Lock</button>
-        </div>
-        <div class="value-row">
-          <span id="heritageResult" class="value">-</span>
-          <span id="heritageSource" class="source-slot"></span>
-        </div>
-      </div>
+          <div class="result-row result-row-accent result-row-accent-ancestry">
+            <div class="result-header">
+              <span class="label">Heritage</span>
+              <button id="lockHeritageBtn" class="lock-button" type="button">Lock</button>
+            </div>
+            <div class="value-row">
+              <span id="heritageResult" class="value">-</span>
+              <span id="heritageSource" class="source-slot"></span>
+            </div>
+          </div>
 
-      <div class="result-row">
-        <div class="result-header">
-          <span class="label">Background</span>
-          <button id="lockBackgroundBtn" class="lock-button" type="button">Lock</button>
+          <div class="result-row result-row-last result-row-accent result-row-accent-background">
+            <div class="result-header">
+              <span class="label">Background</span>
+              <button id="lockBackgroundBtn" class="lock-button" type="button">Lock</button>
+            </div>
+            <div class="value-row">
+              <span id="backgroundResult" class="value">-</span>
+              <span id="backgroundSource" class="source-slot"></span>
+            </div>
+          </div>
         </div>
-        <div class="value-row">
-          <span id="backgroundResult" class="value">-</span>
-          <span id="backgroundSource" class="source-slot"></span>
-        </div>
-      </div>
 
-      <div class="result-row">
-        <div class="result-header">
-          <span class="label">Class</span>
-          <button id="lockClassBtn" class="lock-button" type="button">Lock</button>
-        </div>
-        <div class="value-row">
-          <span id="classResult" class="value">-</span>
-          <span id="classSource" class="source-slot"></span>
-        </div>
-      </div>
+        <div class="result-column">
+          <div class="result-row result-row-accent result-row-accent-class">
+            <div class="result-header">
+              <span class="label">Class</span>
+              <button id="lockClassBtn" class="lock-button" type="button">Lock</button>
+            </div>
+            <div class="value-row">
+              <span id="classResult" class="value">-</span>
+              <span id="classSource" class="source-slot"></span>
+            </div>
+          </div>
 
-      <div class="result-row">
-        <div class="result-header">
-          <span class="label">Key Ability</span>
-          <button id="lockKeyAbilityBtn" class="lock-button" type="button">Lock</button>
-        </div>
-        <div class="value-row">
-          <span id="keyAbilityResult" class="value">-</span>
-          <span id="keyAbilitySource" class="source-slot"></span>
-        </div>
-      </div>
+          <div class="result-row result-row-accent result-row-accent-class">
+            <div class="result-header">
+              <span class="label">Key Ability</span>
+              <button id="lockKeyAbilityBtn" class="lock-button" type="button">Lock</button>
+            </div>
+            <div class="value-row">
+              <span id="keyAbilityResult" class="value">-</span>
+              <span id="keyAbilitySource" class="source-slot"></span>
+            </div>
+          </div>
 
-      <div class="result-block">
-        <div class="result-header">
-          <span class="label">Subclasses</span>
-          <button id="lockSubclassesBtn" class="lock-button" type="button">Lock</button>
+          <div class="result-block result-row-last result-row-accent result-row-accent-class">
+            <div class="result-header">
+              <span class="label">Subclasses</span>
+              <button id="lockSubclassesBtn" class="lock-button" type="button">Lock</button>
+            </div>
+            <div id="subclassResult" class="subclass-list">-</div>
+          </div>
         </div>
-        <div id="subclassResult" class="subclass-list">-</div>
       </div>
     </section>
   </main>

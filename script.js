@@ -129,6 +129,11 @@ function initializeTheme() {
   applyTheme(savedTheme);
 }
 
+function setStatusMessageText(message, isError = false) {
+  statusMessage.textContent = message;
+  statusMessage.classList.toggle("error", isError);
+}
+
 function createSourceButton(sourceText) {
   const normalizedSourceText = String(sourceText || "").trim();
 
@@ -590,8 +595,7 @@ async function loadCsvData(url) {
 // ===============================
 
 async function loadData() {
-  statusMessage.textContent = "Loading character data...";
-  statusMessage.classList.remove("error");
+  setStatusMessageText("Loading character data...");
   generateButton.disabled = true;
   retryButton.hidden = true;
 
@@ -614,13 +618,14 @@ async function loadData() {
 
     renderSourceCheckboxes();
 
-    statusMessage.textContent = "Character data loaded. You can generate a character now.";
+    setStatusMessageText("");
     generateButton.disabled = false;
   } catch (error) {
     console.error("Failed to load character data.", error);
-    statusMessage.textContent =
-      "Could not load character data. Please refresh the page and try again.";
-    statusMessage.classList.add("error");
+    setStatusMessageText(
+      "Could not load character data. Please refresh the page and try again.",
+      true
+    );
     generateButton.disabled = true;
     retryButton.hidden = false;
   }
@@ -851,14 +856,14 @@ function generateCharacter() {
     availableBackgrounds.length === 0 ||
     availableClasses.length === 0
   ) {
-    statusMessage.textContent =
-      "No options match the current filters. Try allowing more rarities or access entries.";
-    statusMessage.classList.add("error");
+    setStatusMessageText(
+      "No options match the current filters. Try allowing more rarities or access entries.",
+      true
+    );
     return;
   }
 
-  statusMessage.textContent = "Character data loaded. You can generate a character now.";
-  statusMessage.classList.remove("error");
+  setStatusMessageText("");
 
   let ancestry = lockedSelections.ancestry;
   let heritage = lockedSelections.heritage;

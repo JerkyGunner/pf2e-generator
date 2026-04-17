@@ -16,6 +16,34 @@
   --button-text: #ffffff;
   --accent: #1d4ed8;
   --error: #b42318;
+  --accent-ancestry: rgba(49, 120, 116, 0.1);
+  --accent-background: rgba(198, 132, 45, 0.12);
+  --accent-class: rgba(67, 97, 238, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme]) {
+    color-scheme: dark;
+    --bg: #11161d;
+    --panel: #18202b;
+    --panel-soft: #1e2733;
+    --panel-muted: #24303d;
+    --text: #edf2f7;
+    --text-soft: #a7b0bd;
+    --text-strong: #f8fafc;
+    --border: #334155;
+    --border-strong: #475569;
+    --shadow-soft: 0 2px 12px rgba(0, 0, 0, 0.28);
+    --shadow-card: 0 14px 34px rgba(0, 0, 0, 0.34);
+    --button: #dbe4f0;
+    --button-hover: #f8fafc;
+    --button-text: #11161d;
+    --accent: #8ab4ff;
+    --error: #ff8b8b;
+    --accent-ancestry: rgba(94, 234, 212, 0.12);
+    --accent-background: rgba(251, 191, 36, 0.12);
+    --accent-class: rgba(129, 140, 248, 0.14);
+  }
 }
 
 body[data-theme="dark"] {
@@ -36,6 +64,9 @@ body[data-theme="dark"] {
   --button-text: #11161d;
   --accent: #8ab4ff;
   --error: #ff8b8b;
+  --accent-ancestry: rgba(94, 234, 212, 0.12);
+  --accent-background: rgba(251, 191, 36, 0.12);
+  --accent-class: rgba(129, 140, 248, 0.14);
 }
 
 body {
@@ -96,6 +127,10 @@ h1 {
   margin-top: 0;
   margin-bottom: 16px;
   color: var(--text-soft);
+}
+
+.status-message:empty {
+  display: none;
 }
 
 .status-message.error {
@@ -224,9 +259,43 @@ button:disabled {
   box-shadow: var(--shadow-card);
 }
 
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.result-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .result-row,
 .result-block {
   margin-bottom: 16px;
+}
+
+.result-row-last {
+  margin-bottom: 0;
+}
+
+.result-row-accent {
+  padding: 14px 14px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.result-row-accent-ancestry {
+  background: var(--accent-ancestry);
+}
+
+.result-row-accent-background {
+  background: var(--accent-background);
+}
+
+.result-row-accent-class {
+  background: var(--accent-class);
 }
 
 .result-header {
@@ -429,5 +498,10 @@ button:disabled {
 
   .result-card {
     padding: 18px;
+  }
+
+  .result-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
   }
 }
