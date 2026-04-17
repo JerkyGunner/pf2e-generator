@@ -55,6 +55,14 @@
             <option value="all">Include All Entries</option>
           </select>
         </div>
+
+        <div class="control-group">
+          <label for="archetypeToggle" class="label">Archetypes</label>
+          <select id="archetypeToggle" class="control-input">
+            <option value="on" selected>Roll Archetypes</option>
+            <option value="off">Turn Archetypes Off</option>
+          </select>
+        </div>
       </div>
 
       <details class="source-panel">
@@ -140,7 +148,6 @@
             </div>
             <div class="value-row">
               <span id="keyAbilityResult" class="value">-</span>
-              <span id="keyAbilitySource" class="source-slot"></span>
             </div>
           </div>
 
@@ -150,6 +157,27 @@
               <button id="lockSubclassesBtn" class="lock-button" type="button">Lock</button>
             </div>
             <div id="subclassResult" class="subclass-list">-</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="archetypeSection" class="archetype-section">
+        <div id="archetypeDivider" class="result-divider" aria-hidden="true"></div>
+
+        <div class="result-grid result-grid-secondary">
+          <div class="result-column result-column-spacer" aria-hidden="true"></div>
+
+          <div class="result-column">
+            <div id="archetypeRow" class="result-row result-row-secondary result-row-secondary-archetype">
+              <div class="result-header">
+                <span class="label">Archetype</span>
+                <button id="lockArchetypeBtn" class="lock-button" type="button">Lock</button>
+              </div>
+              <div class="value-row">
+                <span id="archetypeResult" class="value">-</span>
+                <span id="archetypeSource" class="source-slot"></span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

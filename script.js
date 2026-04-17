@@ -16,6 +16,9 @@ const classCsvUrl =
 const subclassCsvUrl =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=1804749066&single=true&output=csv";
 
+const archetypeCsvUrl =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=1990304273&single=true&output=csv";
+
 const sourceCsvUrl =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=546607334&single=true&output=csv";
 
@@ -27,6 +30,7 @@ let heritages = [];
 let backgrounds = [];
 let classes = [];
 let subclasses = [];
+let archetypes = [];
 let sourceDefinitions = [];
 let currentCharacter = null;
 
@@ -36,6 +40,7 @@ const lockedSelections = {
   background: null,
   class: null,
   keyAbility: null,
+  archetype: null,
   subclasses: null,
 };
 
@@ -45,17 +50,20 @@ const rarityFilterSelect = document.getElementById("rarityFilter");
 const rarityModeGroup = document.getElementById("rarityModeGroup");
 const rarityModeSelect = document.getElementById("rarityMode");
 const accessFilterSelect = document.getElementById("accessFilter");
+const archetypeToggleSelect = document.getElementById("archetypeToggle");
 const sourcePresetSelect = document.getElementById("sourcePreset");
 const sourceCheckboxGroups = document.getElementById("sourceCheckboxGroups");
 const themeSelect = document.getElementById("themeSelect");
 const rarityModeHint = document.getElementById("rarityModeHint");
 const statusMessage = document.getElementById("statusMessage");
+const archetypeSection = document.getElementById("archetypeSection");
 const lockButtons = {
   ancestry: document.getElementById("lockAncestryBtn"),
   heritage: document.getElementById("lockHeritageBtn"),
   background: document.getElementById("lockBackgroundBtn"),
   class: document.getElementById("lockClassBtn"),
   keyAbility: document.getElementById("lockKeyAbilityBtn"),
+  archetype: document.getElementById("lockArchetypeBtn"),
   subclasses: document.getElementById("lockSubclassesBtn"),
 };
 
@@ -172,6 +180,18 @@ function normalizeRarity(item) {
   return String(item.rarity || "common").toLowerCase().trim();
 }
 
+function isTrueValue(value) {
+  return String(value || "").trim().toLowerCase() === "true";
+}
+
+function isArchetypeEnabled() {
+  return archetypeToggleSelect.value === "on";
+}
+
+function updateArchetypeVisibility() {
+  archetypeSection.hidden = !isArchetypeEnabled();
+}
+
 function getAllowedRarities() {
   const rarityFilter = rarityFilterSelect.value;
 
@@ -230,6 +250,109 @@ function filterBySource(array) {
   }
 
   return array.filter(item => selectedSourceNames.has(normalizeSourceName(item.source)));
+}
+
+function matchesOptionalRequirement(requiredValue, actualValue) {
+  const normalizedRequiredValue = String(requiredValue || "").trim().toLowerCase();
+
+  if (!normalizedRequiredValue) {
+    return true;
+  }
+
+  return normalizedRequiredValue === String(actualValue || "").trim().toLowerCase();
+}
+
+function filterArchetypesForCharacter(chosenClass, chosenAncestry) {
+  return applyActiveFilters(archetypes).filter(archetype => {
+    if (String(archetype.name).trim().toLowerCase() === String(chosenClass.name).trim().toLowerCase()) {
+      return false;
+    }
+
+    if (isTrueValue(archetype.requires_spellcasting) && !isTrueValue(chosenClass.is_spellcaster)) {
+      return false;
+    }
+
+    if (!matchesOptionalRequirement(archetype.required_class, chosenClass.name)) {
+      return false;
+    }
+
+    if (!matchesOptionalRequirement(archetype.required_ancestry, chosenAncestry.name)) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+function chooseArchetype(chosenClass, chosenAncestry) {
+  if (!isArchetypeEnabled()) {
+    return null;
+  }
+
+  const matchingArchetypes = filterArchetypesForCharacter(chosenClass, chosenAncestry);
+
+  if (matchingArchetypes.length === 0) {
+    return null;
+  }
+
+  const classArchetypes = matchingArchetypes.filter(
+    archetype => String(archetype.type).trim().toLowerCase() === "class"
+  );
+  const otherArchetypes = matchingArchetypes.filter(
+    archetype => String(archetype.type).trim().toLowerCase() === "other"
+  );
+  const chooseClassArchetype = Math.random() < 0.5;
+  const preferredPool = chooseClassArchetype ? classArchetypes : otherArchetypes;
+  const fallbackPool = chooseClassArchetype ? otherArchetypes : classArchetypes;
+  const finalPool = preferredPool.length > 0 ? preferredPool : fallbackPool;
+
+  return weightedRandomItem(finalPool);
+}
+
+function filterClassesForLockedArchetype(classOptions, chosenArchetype) {
+  if (!chosenArchetype) {
+    return classOptions;
+  }
+
+  const lockedArchetypeName = String(chosenArchetype.name).trim().toLowerCase();
+
+  return classOptions.filter(characterClass =>
+    String(characterClass.name).trim().toLowerCase() !== lockedArchetypeName
+  );
+}
+
+function syncSelectionsFromLockedArchetype(chosenArchetype, chosenClass, chosenAncestry) {
+  if (!chosenArchetype) {
+    return {
+      chosenClass,
+      chosenAncestry,
+    };
+  }
+
+  if (!chosenAncestry && chosenArchetype.required_ancestry) {
+    chosenAncestry =
+      findAncestryByName(chosenArchetype.required_ancestry) || { name: chosenArchetype.required_ancestry };
+  }
+
+  if (!chosenClass) {
+    if (chosenArchetype.required_class) {
+      chosenClass =
+        findClassByName(chosenArchetype.required_class) || { name: chosenArchetype.required_class };
+    } else if (isTrueValue(chosenArchetype.requires_spellcasting)) {
+      const spellcastingClasses = applyActiveFilters(classes).filter(characterClass =>
+        isTrueValue(characterClass.is_spellcaster)
+      );
+
+      if (spellcastingClasses.length > 0) {
+        chosenClass = weightedRandomItem(spellcastingClasses);
+      }
+    }
+  }
+
+  return {
+    chosenClass,
+    chosenAncestry,
+  };
 }
 
 function getSourceCategoryDefinitions() {
@@ -606,6 +729,7 @@ async function loadData() {
       backgrounds,
       classes,
       subclasses,
+      archetypes,
       sourceDefinitions,
     ] = await Promise.all([
       loadCsvData(ancestryCsvUrl),
@@ -613,6 +737,7 @@ async function loadData() {
       loadCsvData(backgroundCsvUrl),
       loadCsvData(classCsvUrl),
       loadCsvData(subclassCsvUrl),
+      loadCsvData(archetypeCsvUrl),
       loadCsvData(sourceCsvUrl),
     ]);
 
@@ -849,7 +974,10 @@ function generateCharacter() {
 
   const availableAncestries = applyActiveFilters(ancestries);
   const availableBackgrounds = applyActiveFilters(backgrounds);
-  const availableClasses = applyActiveFilters(classes);
+  const availableClasses = filterClassesForLockedArchetype(
+    applyActiveFilters(classes),
+    isArchetypeEnabled() ? lockedSelections.archetype : null
+  );
 
   if (
     availableAncestries.length === 0 ||
@@ -871,6 +999,16 @@ function generateCharacter() {
   let chosenClass = lockedSelections.class;
   let chosenSubclasses = lockedSelections.subclasses;
   let chosenKeyAbility = lockedSelections.keyAbility;
+  let chosenArchetype = isArchetypeEnabled() ? lockedSelections.archetype : null;
+
+  ({
+    chosenClass,
+    chosenAncestry: ancestry,
+  } = {
+    chosenClass,
+    chosenAncestry: ancestry,
+    ...syncSelectionsFromLockedArchetype(chosenArchetype, chosenClass, ancestry),
+  });
 
   if (!ancestry && heritage) {
     ancestry = findAncestryByName(heritage.ancestry) || { name: heritage.ancestry };
@@ -919,12 +1057,17 @@ function generateCharacter() {
     chosenKeyAbility = chooseKeyAbility(chosenClass, chosenSubclasses);
   }
 
+  if (!chosenArchetype) {
+    chosenArchetype = chooseArchetype(chosenClass, ancestry);
+  }
+
   currentCharacter = {
     ancestry: cloneValue(ancestry),
     heritage: cloneValue(heritage),
     background: cloneValue(background),
     class: cloneValue(chosenClass),
     keyAbility: cloneValue(chosenKeyAbility),
+    archetype: cloneValue(chosenArchetype),
     subclasses: cloneValue(chosenSubclasses),
   };
 
@@ -938,11 +1081,14 @@ function generateCharacter() {
   );
   setValueAndSource("backgroundResult", "backgroundSource", background.name, background.source);
   setValueAndSource("classResult", "classSource", chosenClass.name, chosenClass.source);
+  document.getElementById("keyAbilityResult").textContent = chosenKeyAbility.value;
   setValueAndSource(
-    "keyAbilityResult",
-    "keyAbilitySource",
-    chosenKeyAbility.value,
-    chosenKeyAbility.sourceText
+    "archetypeResult",
+    "archetypeSource",
+    isArchetypeEnabled()
+      ? (chosenArchetype ? chosenArchetype.name : "None")
+      : "Off",
+    isArchetypeEnabled() && chosenArchetype ? chosenArchetype.source : ""
   );
 
   // Display subclasses nicely as separate boxes
@@ -984,6 +1130,14 @@ retryButton.addEventListener("click", loadData);
 rarityFilterSelect.addEventListener("change", updateRarityModeControl);
 rarityModeSelect.addEventListener("change", updateRarityModeHint);
 sourcePresetSelect.addEventListener("change", applySourcePreset);
+archetypeToggleSelect.addEventListener("change", () => {
+  if (!isArchetypeEnabled()) {
+    lockedSelections.archetype = null;
+    updateLockButtons();
+  }
+
+  updateArchetypeVisibility();
+});
 themeSelect.addEventListener("change", event => {
   const theme = event.target.value;
   localStorage.setItem(themeStorageKey, theme);
@@ -994,8 +1148,10 @@ lockButtons.heritage.addEventListener("click", () => toggleLock("heritage"));
 lockButtons.background.addEventListener("click", () => toggleLock("background"));
 lockButtons.class.addEventListener("click", () => toggleLock("class"));
 lockButtons.keyAbility.addEventListener("click", () => toggleLock("keyAbility"));
+lockButtons.archetype.addEventListener("click", () => toggleLock("archetype"));
 lockButtons.subclasses.addEventListener("click", () => toggleLock("subclasses"));
 updateLockButtons();
 initializeTheme();
 updateRarityModeControl();
+updateArchetypeVisibility();
 loadData();
