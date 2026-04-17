@@ -3,42 +3,79 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PF2E Random Character Generator</title>
+  <title>PF2E Character Generator</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="container">
-    <h1>PF2E Random Character Generator</h1>
-    <p class="subtitle">Generate a random ancestry, heritage, background, class, and subclass setup.</p>
-
-    <div class="controls-row">
-      <div class="control-group">
-        <label for="rarityFilter" class="label">Allowed Rarities</label>
-        <select id="rarityFilter" class="control-input">
-          <option value="common-only">Common Only</option>
-          <option value="common-uncommon">Common and Uncommon Only</option>
-          <option value="all" selected>All Rarities</option>
-        </select>
+    <div class="page-header">
+      <div>
+        <h1>PF2E Character Generator</h1>
+        <p class="subtitle">Generate a random ancestry, heritage, background, class, and subclass setup.</p>
       </div>
 
-      <div id="rarityModeGroup" class="control-group">
-        <label for="rarityMode" class="label">Rarity Weighting</label>
-        <select id="rarityMode" class="control-input">
-          <option value="strong" selected>Common Favored (Common 10, Uncommon 3, Rare 1)</option>
-          <option value="light">Balanced (Common 4, Uncommon 3, Rare 2)</option>
-          <option value="off">Pure Random (All rarities 1)</option>
-        </select>
-      </div>
-
-      <div class="control-group">
-        <label for="accessFilter" class="label">Society Access</label>
-        <select id="accessFilter" class="control-input">
-          <option value="standard-only" selected>Hide Society Limited and Society Restricted</option>
-          <option value="hide-restricted">Hide Society Restricted Only</option>
-          <option value="all">Include All Entries</option>
+      <div class="theme-control">
+        <label for="themeSelect" class="theme-label">Theme</label>
+        <select id="themeSelect" class="theme-select">
+          <option value="system" selected>System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
         </select>
       </div>
     </div>
+
+    <details class="options-panel">
+      <summary class="options-summary">Generation Options</summary>
+
+      <div class="controls-row options-content">
+        <div class="control-group">
+          <label for="rarityFilter" class="label">Allowed Rarities</label>
+          <select id="rarityFilter" class="control-input">
+            <option value="common-only">Common Only</option>
+            <option value="common-uncommon">Common and Uncommon Only</option>
+            <option value="all" selected>All Rarities</option>
+          </select>
+        </div>
+
+        <div id="rarityModeGroup" class="control-group">
+          <label for="rarityMode" class="label">Rarity Weighting</label>
+          <select id="rarityMode" class="control-input">
+            <option value="strong" selected>Common Favored (Common 10, Uncommon 3, Rare 1)</option>
+            <option value="light">Balanced (Common 4, Uncommon 3, Rare 2)</option>
+            <option value="off">Pure Random (All rarities 1)</option>
+          </select>
+          <p id="rarityModeHint" class="control-hint"></p>
+        </div>
+
+        <div class="control-group">
+          <label for="accessFilter" class="label">Society Access</label>
+          <select id="accessFilter" class="control-input">
+            <option value="standard-only" selected>Hide Society Limited and Society Restricted</option>
+            <option value="hide-restricted">Hide Society Restricted Only</option>
+            <option value="all">Include All Entries</option>
+          </select>
+        </div>
+      </div>
+
+      <details class="source-panel">
+        <summary class="source-summary">Source Selection</summary>
+
+        <div class="control-group source-preset-group">
+          <label for="sourcePreset" class="label">Source Preset</label>
+          <select id="sourcePreset" class="control-input">
+            <option value="core-only">Core Only</option>
+            <option value="core-rulebooks">Core and Rulebooks</option>
+            <option value="core-rulebooks-lost-omens" selected>Core, Rulebooks and Lost Omens</option>
+            <option value="all">All Sources</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <span class="label">Included Sources</span>
+          <div id="sourceCheckboxGroups" class="source-groups"></div>
+        </div>
+      </details>
+    </details>
 
     <p id="statusMessage" class="status-message" aria-live="polite">Loading character data...</p>
 
@@ -53,7 +90,10 @@
           <span class="label">Ancestry</span>
           <button id="lockAncestryBtn" class="lock-button" type="button">Lock</button>
         </div>
-        <span id="ancestryResult" class="value">-</span>
+        <div class="value-row">
+          <span id="ancestryResult" class="value">-</span>
+          <span id="ancestrySource" class="source-slot"></span>
+        </div>
       </div>
 
       <div class="result-row">
@@ -61,7 +101,10 @@
           <span class="label">Heritage</span>
           <button id="lockHeritageBtn" class="lock-button" type="button">Lock</button>
         </div>
-        <span id="heritageResult" class="value">-</span>
+        <div class="value-row">
+          <span id="heritageResult" class="value">-</span>
+          <span id="heritageSource" class="source-slot"></span>
+        </div>
       </div>
 
       <div class="result-row">
@@ -69,7 +112,10 @@
           <span class="label">Background</span>
           <button id="lockBackgroundBtn" class="lock-button" type="button">Lock</button>
         </div>
-        <span id="backgroundResult" class="value">-</span>
+        <div class="value-row">
+          <span id="backgroundResult" class="value">-</span>
+          <span id="backgroundSource" class="source-slot"></span>
+        </div>
       </div>
 
       <div class="result-row">
@@ -77,7 +123,10 @@
           <span class="label">Class</span>
           <button id="lockClassBtn" class="lock-button" type="button">Lock</button>
         </div>
-        <span id="classResult" class="value">-</span>
+        <div class="value-row">
+          <span id="classResult" class="value">-</span>
+          <span id="classSource" class="source-slot"></span>
+        </div>
       </div>
 
       <div class="result-row">
@@ -85,7 +134,10 @@
           <span class="label">Key Ability</span>
           <button id="lockKeyAbilityBtn" class="lock-button" type="button">Lock</button>
         </div>
-        <span id="keyAbilityResult" class="value">-</span>
+        <div class="value-row">
+          <span id="keyAbilityResult" class="value">-</span>
+          <span id="keyAbilitySource" class="source-slot"></span>
+        </div>
       </div>
 
       <div class="result-block">

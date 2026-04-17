@@ -16,6 +16,9 @@ const classCsvUrl =
 const subclassCsvUrl =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=1804749066&single=true&output=csv";
 
+const sourceCsvUrl =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=546607334&single=true&output=csv";
+
 // ===============================
 // DATA STORAGE
 // ===============================
@@ -24,6 +27,7 @@ let heritages = [];
 let backgrounds = [];
 let classes = [];
 let subclasses = [];
+let sourceDefinitions = [];
 let currentCharacter = null;
 
 const lockedSelections = {
@@ -41,6 +45,10 @@ const rarityFilterSelect = document.getElementById("rarityFilter");
 const rarityModeGroup = document.getElementById("rarityModeGroup");
 const rarityModeSelect = document.getElementById("rarityMode");
 const accessFilterSelect = document.getElementById("accessFilter");
+const sourcePresetSelect = document.getElementById("sourcePreset");
+const sourceCheckboxGroups = document.getElementById("sourceCheckboxGroups");
+const themeSelect = document.getElementById("themeSelect");
+const rarityModeHint = document.getElementById("rarityModeHint");
 const statusMessage = document.getElementById("statusMessage");
 const lockButtons = {
   ancestry: document.getElementById("lockAncestryBtn"),
@@ -63,6 +71,15 @@ const rarityModeOptions = {
     { value: "off", label: "Pure Random (Common 1, Uncommon 1)" },
   ],
 };
+
+const sourcePresetCategories = {
+  "core-only": ["Core"],
+  "core-rulebooks": ["Core", "Rulebook"],
+  "core-rulebooks-lost-omens": ["Core", "Rulebook", "Lost Omens"],
+  all: ["Core", "Rulebook", "Lost Omens", "Adventure Path", "Adventure Module"],
+};
+
+const themeStorageKey = "pf2e-generator-theme";
 
 // ===============================
 // HELPER FUNCTIONS
@@ -87,6 +104,63 @@ function cloneValue(value) {
   }
 
   return value;
+}
+
+function getCurrentThemeOptionLabel() {
+  return rarityModeSelect.options[rarityModeSelect.selectedIndex]?.textContent || "";
+}
+
+function updateRarityModeHint() {
+  rarityModeHint.textContent = getCurrentThemeOptionLabel();
+}
+
+function applyTheme(theme) {
+  if (theme === "dark" || theme === "light") {
+    document.body.dataset.theme = theme;
+    return;
+  }
+
+  document.body.removeAttribute("data-theme");
+}
+
+function initializeTheme() {
+  const savedTheme = localStorage.getItem(themeStorageKey) || "system";
+  themeSelect.value = savedTheme;
+  applyTheme(savedTheme);
+}
+
+function createSourceButton(sourceText) {
+  const normalizedSourceText = String(sourceText || "").trim();
+
+  if (!normalizedSourceText) {
+    return null;
+  }
+
+  const sourceButton = document.createElement("button");
+  sourceButton.type = "button";
+  sourceButton.className = "source-button";
+  sourceButton.textContent = "i";
+  sourceButton.title = normalizedSourceText;
+  sourceButton.setAttribute("aria-label", `Source: ${normalizedSourceText}`);
+  return sourceButton;
+}
+
+function setValueAndSource(resultId, sourceId, valueText, sourceText) {
+  const resultElement = document.getElementById(resultId);
+  const sourceElement = document.getElementById(sourceId);
+
+  resultElement.textContent = valueText;
+  sourceElement.replaceChildren();
+
+  const sourceButton = createSourceButton(sourceText);
+
+  if (sourceButton) {
+    sourceElement.appendChild(sourceButton);
+  }
+}
+
+function normalizeSourceName(value) {
+  return String(value || "").trim();
 }
 
 function normalizeRarity(item) {
@@ -135,7 +209,160 @@ function filterByAccess(array) {
 }
 
 function applyActiveFilters(array) {
-  return filterByAccess(filterByAllowedRarities(array));
+  return filterBySource(filterByAccess(filterByAllowedRarities(array)));
+}
+
+function getSelectedSourceNames() {
+  const checkedInputs = sourceCheckboxGroups.querySelectorAll("input[type=\"checkbox\"]:checked");
+  return new Set([...checkedInputs].map(input => input.value));
+}
+
+function filterBySource(array) {
+  const selectedSourceNames = getSelectedSourceNames();
+
+  if (selectedSourceNames.size === 0) {
+    return [];
+  }
+
+  return array.filter(item => selectedSourceNames.has(normalizeSourceName(item.source)));
+}
+
+function getSourceCategoryDefinitions() {
+  return [
+    {
+      category: "Core",
+      groups: [
+        {
+          title: "Core",
+          sources: sourceDefinitions.filter(source => source.category === "Core"),
+        },
+      ],
+    },
+    {
+      category: "Rulebook",
+      groups: [
+        {
+          title: "Rulebook",
+          sources: sourceDefinitions.filter(source => source.category === "Rulebook"),
+        },
+      ],
+    },
+    {
+      category: "Lost Omens",
+      groups: [
+        {
+          title: "Lost Omens",
+          sources: sourceDefinitions.filter(source => source.category === "Lost Omens"),
+        },
+      ],
+    },
+    {
+      category: "Adventure",
+      groups: [
+        {
+          title: "Adventure Path",
+          sources: sourceDefinitions.filter(source => source.category === "Adventure Path"),
+        },
+        {
+          title: "Adventure Module",
+          sources: sourceDefinitions.filter(source => source.category === "Adventure Module"),
+        },
+      ],
+    },
+  ];
+}
+
+function applySourcePreset() {
+  const allowedCategories = sourcePresetCategories[sourcePresetSelect.value] || [];
+  const sourceCheckboxes = sourceCheckboxGroups.querySelectorAll("input[type=\"checkbox\"]");
+
+  sourceCheckboxes.forEach(checkbox => {
+    checkbox.checked = allowedCategories.includes(checkbox.dataset.category);
+  });
+}
+
+function renderSourceCheckboxes() {
+  sourceCheckboxGroups.replaceChildren();
+
+  const categoryDefinitions = getSourceCategoryDefinitions();
+
+  categoryDefinitions.forEach(({ category, groups }) => {
+    const groupsWithSources = groups.filter(group => group.sources.length > 0);
+
+    if (groupsWithSources.length === 0) {
+      return;
+    }
+
+    const groupElement = document.createElement("details");
+    groupElement.className = "source-group";
+
+    const titleElement = document.createElement("summary");
+    titleElement.className = "source-group-summary";
+    titleElement.textContent = category;
+    groupElement.appendChild(titleElement);
+
+    const optionsWrapper = document.createElement("div");
+    optionsWrapper.className = "source-group-options";
+
+    groupsWithSources.forEach(group => {
+      if (groupsWithSources.length === 1 && group.title === category) {
+        group.sources.forEach(source => {
+          const optionLabel = document.createElement("label");
+          optionLabel.className = "source-option";
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.value = source.source_name;
+          checkbox.dataset.category = source.category;
+
+          const text = document.createElement("span");
+          text.textContent = source.source_name;
+
+          optionLabel.appendChild(checkbox);
+          optionLabel.appendChild(text);
+          optionsWrapper.appendChild(optionLabel);
+        });
+
+        return;
+      }
+
+      const subgroupElement = document.createElement("details");
+      subgroupElement.className = "source-subgroup";
+
+      const subgroupSummary = document.createElement("summary");
+      subgroupSummary.className = "source-subgroup-summary";
+      subgroupSummary.textContent = group.title;
+      subgroupElement.appendChild(subgroupSummary);
+
+      const subgroupOptions = document.createElement("div");
+      subgroupOptions.className = "source-subgroup-options";
+
+      group.sources.forEach(source => {
+        const optionLabel = document.createElement("label");
+        optionLabel.className = "source-option";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = source.source_name;
+        checkbox.dataset.category = source.category;
+
+        const text = document.createElement("span");
+        text.textContent = source.source_name;
+
+        optionLabel.appendChild(checkbox);
+        optionLabel.appendChild(text);
+        subgroupOptions.appendChild(optionLabel);
+      });
+
+      subgroupElement.appendChild(subgroupOptions);
+      optionsWrapper.appendChild(subgroupElement);
+    });
+
+    groupElement.appendChild(optionsWrapper);
+    sourceCheckboxGroups.appendChild(groupElement);
+  });
+
+  applySourcePreset();
 }
 
 function findAncestryByName(name) {
@@ -187,6 +414,7 @@ function updateRarityModeControl() {
   if (rarityFilter === "common-only") {
     rarityModeGroup.hidden = true;
     rarityModeSelect.disabled = true;
+    rarityModeHint.textContent = "";
     return;
   }
 
@@ -206,6 +434,7 @@ function updateRarityModeControl() {
   rarityModeSelect.value = optionSet.some(option => option.value === currentMode)
     ? currentMode
     : optionSet[0].value;
+  updateRarityModeHint();
 }
 
 function rarityWeight(item) {
@@ -373,13 +602,17 @@ async function loadData() {
       backgrounds,
       classes,
       subclasses,
+      sourceDefinitions,
     ] = await Promise.all([
       loadCsvData(ancestryCsvUrl),
       loadCsvData(heritageCsvUrl),
       loadCsvData(backgroundCsvUrl),
       loadCsvData(classCsvUrl),
       loadCsvData(subclassCsvUrl),
+      loadCsvData(sourceCsvUrl),
     ]);
+
+    renderSourceCheckboxes();
 
     statusMessage.textContent = "Character data loaded. You can generate a character now.";
     generateButton.disabled = false;
@@ -543,7 +776,10 @@ function chooseKeyAbility(chosenClass, chosenSubclasses) {
     if (subconsciousMind && subconsciousMind.key_ability) {
       const psychicOptions = parseKeyAbilityOptions(subconsciousMind.key_ability);
       if (psychicOptions.length > 0) {
-        return randomItem(psychicOptions);
+        return {
+          value: randomItem(psychicOptions),
+          sourceText: `${subconsciousMind.name} (${subconsciousMind.source})`,
+        };
       }
     }
   }
@@ -569,13 +805,32 @@ function chooseKeyAbility(chosenClass, chosenSubclasses) {
   // If the class has no usable key ability data
   // -------------------------------
   if (keyAbilityOptions.length === 0) {
-    return "Unknown";
+    return {
+      value: "Unknown",
+      sourceText: "",
+    };
   }
 
   // -------------------------------
   // Pick one final key ability from the valid options
   // -------------------------------
-  return randomItem(keyAbilityOptions);
+  const chosenValue = randomItem(keyAbilityOptions);
+  const matchingSources = [];
+
+  if (parseKeyAbilityOptions(chosenClass.key_ability).includes(chosenValue) && chosenClass.source) {
+    matchingSources.push(chosenClass.source);
+  }
+
+  chosenSubclasses.forEach(subclass => {
+    if (parseKeyAbilityOptions(subclass.key_ability).includes(chosenValue) && subclass.source) {
+      matchingSources.push(`${subclass.name} (${subclass.source})`);
+    }
+  });
+
+  return {
+    value: chosenValue,
+    sourceText: uniqueValues(matchingSources).join(" | "),
+  };
 }
 
 // ===============================
@@ -669,11 +924,21 @@ function generateCharacter() {
   };
 
   // Display simple results
-  document.getElementById("ancestryResult").textContent = ancestry.name;
-  document.getElementById("heritageResult").textContent = heritage ? heritage.name : "None";
-  document.getElementById("backgroundResult").textContent = background.name;
-  document.getElementById("classResult").textContent = chosenClass.name;
-  document.getElementById("keyAbilityResult").textContent = chosenKeyAbility;
+  setValueAndSource("ancestryResult", "ancestrySource", ancestry.name, ancestry.source);
+  setValueAndSource(
+    "heritageResult",
+    "heritageSource",
+    heritage ? heritage.name : "None",
+    heritage ? heritage.source : ""
+  );
+  setValueAndSource("backgroundResult", "backgroundSource", background.name, background.source);
+  setValueAndSource("classResult", "classSource", chosenClass.name, chosenClass.source);
+  setValueAndSource(
+    "keyAbilityResult",
+    "keyAbilitySource",
+    chosenKeyAbility.value,
+    chosenKeyAbility.sourceText
+  );
 
   // Display subclasses nicely as separate boxes
   const subclassResultElement = document.getElementById("subclassResult");
@@ -683,9 +948,18 @@ function generateCharacter() {
     chosenSubclasses.forEach(subclass => {
       const subclassItem = document.createElement("div");
       subclassItem.className = "subclass-item";
-      subclassItem.textContent = subclass.subclass_label
+      const subclassText = document.createElement("span");
+      subclassText.textContent = subclass.subclass_label
         ? `${subclass.subclass_label}: ${subclass.name}`
         : subclass.name;
+
+      subclassItem.appendChild(subclassText);
+
+      const sourceButton = createSourceButton(subclass.source);
+      if (sourceButton) {
+        subclassItem.appendChild(sourceButton);
+      }
+
       subclassResultElement.appendChild(subclassItem);
     });
   } else {
@@ -703,6 +977,13 @@ function generateCharacter() {
 generateButton.addEventListener("click", generateCharacter);
 retryButton.addEventListener("click", loadData);
 rarityFilterSelect.addEventListener("change", updateRarityModeControl);
+rarityModeSelect.addEventListener("change", updateRarityModeHint);
+sourcePresetSelect.addEventListener("change", applySourcePreset);
+themeSelect.addEventListener("change", event => {
+  const theme = event.target.value;
+  localStorage.setItem(themeStorageKey, theme);
+  applyTheme(theme);
+});
 lockButtons.ancestry.addEventListener("click", () => toggleLock("ancestry"));
 lockButtons.heritage.addEventListener("click", () => toggleLock("heritage"));
 lockButtons.background.addEventListener("click", () => toggleLock("background"));
@@ -710,5 +991,6 @@ lockButtons.class.addEventListener("click", () => toggleLock("class"));
 lockButtons.keyAbility.addEventListener("click", () => toggleLock("keyAbility"));
 lockButtons.subclasses.addEventListener("click", () => toggleLock("subclasses"));
 updateLockButtons();
+initializeTheme();
 updateRarityModeControl();
 loadData();
