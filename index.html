@@ -56,6 +56,22 @@
             <option value="off">Turn Archetypes Off</option>
           </select>
         </div>
+
+        <div class="control-group">
+          <label for="regionMode" class="label">Region Weighting</label>
+          <select id="regionMode" class="control-input">
+            <option value="inner-sea" selected>Default (Inner Sea)</option>
+            <option value="explore">Explore (Non-Inner Sea Favored)</option>
+            <option value="balanced">Balanced</option>
+            <option value="custom">Custom</option>
+          </select>
+          <p id="regionModeHint" class="control-hint"></p>
+        </div>
+      </div>
+
+      <div id="customRegionGroup" class="control-group control-group-wide" hidden>
+        <span class="label">Custom Continents</span>
+        <div id="regionCheckboxGroups" class="region-groups"></div>
       </div>
 
       <details class="source-panel">
@@ -120,6 +136,7 @@
               <span id="backgroundSource" class="source-slot"></span>
             </div>
           </div>
+
         </div>
 
         <div class="result-column">
@@ -154,13 +171,23 @@
         </div>
       </div>
 
-      <div id="archetypeSection" class="archetype-section">
-        <div id="archetypeDivider" class="result-divider" aria-hidden="true"></div>
+      <div class="result-divider" aria-hidden="true"></div>
 
-        <div class="result-grid result-grid-secondary">
-          <div class="result-column result-column-spacer" aria-hidden="true"></div>
+      <div class="result-grid result-grid-secondary">
+        <div class="result-column">
+          <div class="result-row result-row-secondary result-row-secondary-region">
+            <div class="result-header">
+              <span class="label">Region</span>
+            </div>
+            <div class="value-row">
+              <span id="regionResult" class="value">-</span>
+              <span id="regionSource" class="source-slot"></span>
+            </div>
+          </div>
+        </div>
 
-          <div class="result-column">
+        <div class="result-column">
+          <div id="archetypeSection" class="archetype-section">
             <div id="archetypeRow" class="result-row result-row-secondary result-row-secondary-archetype">
               <div class="result-header">
                 <span class="label">Archetype</span>

@@ -10,6 +10,9 @@ const heritageCsvUrl =
 const backgroundCsvUrl =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=59254066&single=true&output=csv";
 
+const regionCsvUrl =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=1217750278&single=true&output=csv";
+
 const classCsvUrl =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=982187207&single=true&output=csv";
 
@@ -28,6 +31,7 @@ const sourceCsvUrl =
 let ancestries = [];
 let heritages = [];
 let backgrounds = [];
+let regions = [];
 let classes = [];
 let subclasses = [];
 let archetypes = [];
@@ -51,10 +55,14 @@ const rarityModeGroup = document.getElementById("rarityModeGroup");
 const rarityModeSelect = document.getElementById("rarityMode");
 const accessFilterSelect = document.getElementById("accessFilter");
 const archetypeToggleSelect = document.getElementById("archetypeToggle");
+const regionModeSelect = document.getElementById("regionMode");
 const sourcePresetSelect = document.getElementById("sourcePreset");
 const sourceCheckboxGroups = document.getElementById("sourceCheckboxGroups");
+const customRegionGroup = document.getElementById("customRegionGroup");
+const regionCheckboxGroups = document.getElementById("regionCheckboxGroups");
 const themeToggle = document.getElementById("themeToggle");
 const rarityModeHint = document.getElementById("rarityModeHint");
+const regionModeHint = document.getElementById("regionModeHint");
 const statusMessage = document.getElementById("statusMessage");
 const archetypeSection = document.getElementById("archetypeSection");
 const lockButtons = {
@@ -78,6 +86,13 @@ const rarityModeOptions = {
     { value: "light", label: "Balanced (Common 4, Uncommon 3)" },
     { value: "off", label: "Pure Random (Common 1, Uncommon 1)" },
   ],
+};
+
+const regionModeOptions = {
+  "inner-sea": "Avistan and Garund are favored over the other continents.",
+  explore: "Non-Inner Sea continents are favored over Avistan and Garund.",
+  balanced: "All continents are treated equally.",
+  custom: "Choose exactly which continents can be rolled, then treat them equally.",
 };
 
 const sourcePresetCategories = {
@@ -120,6 +135,10 @@ function getCurrentThemeOptionLabel() {
 
 function updateRarityModeHint() {
   rarityModeHint.textContent = getCurrentThemeOptionLabel();
+}
+
+function updateRegionModeHint() {
+  regionModeHint.textContent = regionModeOptions[regionModeSelect.value] || "";
 }
 
 function applyTheme(theme) {
@@ -211,6 +230,10 @@ function normalizeSourceName(value) {
   return String(value || "").trim();
 }
 
+function normalizeContinentName(value) {
+  return String(value || "").trim();
+}
+
 function normalizeRarity(item) {
   return String(item.rarity || "common").toLowerCase().trim();
 }
@@ -228,6 +251,18 @@ function splitCsvValues(value) {
     .split(",")
     .map(item => item.trim().toLowerCase())
     .filter(item => item !== "");
+}
+
+function getAvailableRegions() {
+  return regions.filter(region => String(region.name || "").trim() !== "");
+}
+
+function getAvailableContinents() {
+  return [...new Set(
+    getAvailableRegions()
+      .map(region => normalizeContinentName(region.continent))
+      .filter(continent => continent !== "")
+  )].sort((a, b) => a.localeCompare(b));
 }
 
 function updateArchetypeVisibility() {
@@ -524,6 +559,121 @@ function getSourceCategoryDefinitions() {
       ],
     },
   ];
+}
+
+function renderRegionCheckboxes() {
+  regionCheckboxGroups.replaceChildren();
+
+  getAvailableContinents().forEach(continent => {
+    const optionLabel = document.createElement("label");
+    optionLabel.className = "region-option";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = continent;
+    checkbox.checked = true;
+
+    const text = document.createElement("span");
+    text.textContent = continent;
+
+    optionLabel.appendChild(checkbox);
+    optionLabel.appendChild(text);
+    regionCheckboxGroups.appendChild(optionLabel);
+  });
+}
+
+function updateRegionModeControl() {
+  const isCustomMode = regionModeSelect.value === "custom";
+  customRegionGroup.hidden = !isCustomMode;
+  updateRegionModeHint();
+}
+
+function getSelectedCustomContinents() {
+  return new Set(
+    [...regionCheckboxGroups.querySelectorAll("input[type=\"checkbox\"]:checked")]
+      .map(input => input.value)
+  );
+}
+
+function continentWeight(continent) {
+  const normalizedContinent = normalizeContinentName(continent);
+  const innerSeaContinents = new Set(["Avistan", "Garund"]);
+  const isInnerSeaContinent = innerSeaContinents.has(normalizedContinent);
+
+  if (regionModeSelect.value === "balanced" || regionModeSelect.value === "custom") {
+    return 1;
+  }
+
+  if (regionModeSelect.value === "explore") {
+    return isInnerSeaContinent ? 1 : 3;
+  }
+
+  return isInnerSeaContinent ? 3 : 1;
+}
+
+function weightedRandomContinent(continents) {
+  if (continents.length === 0) {
+    return null;
+  }
+
+  const totalWeight = continents.reduce((sum, continent) => sum + continentWeight(continent), 0);
+  let remainingWeight = Math.random() * totalWeight;
+
+  for (const continent of continents) {
+    remainingWeight -= continentWeight(continent);
+
+    if (remainingWeight < 0) {
+      return continent;
+    }
+  }
+
+  return continents[continents.length - 1];
+}
+
+function chooseRegionFromTab() {
+  const availableRegions = getAvailableRegions();
+
+  if (availableRegions.length === 0) {
+    return null;
+  }
+
+  const regionsByContinent = availableRegions.reduce((map, region) => {
+    const continent = normalizeContinentName(region.continent);
+
+    if (!continent) {
+      return map;
+    }
+
+    if (!map.has(continent)) {
+      map.set(continent, []);
+    }
+
+    map.get(continent).push(region);
+    return map;
+  }, new Map());
+
+  let continentPool = [...regionsByContinent.keys()];
+
+  if (regionModeSelect.value === "custom") {
+    const selectedContinents = getSelectedCustomContinents();
+    continentPool = continentPool.filter(continent => selectedContinents.has(continent));
+  }
+
+  if (continentPool.length === 0) {
+    return null;
+  }
+
+  const chosenContinent = weightedRandomContinent(continentPool);
+  const chosenRegion = randomItem(regionsByContinent.get(chosenContinent) || []);
+
+  if (!chosenRegion) {
+    return null;
+  }
+
+  return {
+    name: chosenRegion.name,
+    sourceText: `Continent: ${chosenContinent}`,
+  };
 }
 
 function applySourcePreset() {
@@ -853,6 +1003,7 @@ async function loadData() {
       ancestries,
       heritages,
       backgrounds,
+      regions,
       classes,
       subclasses,
       archetypes,
@@ -861,6 +1012,7 @@ async function loadData() {
       loadCsvData(ancestryCsvUrl),
       loadCsvData(heritageCsvUrl),
       loadCsvData(backgroundCsvUrl),
+      loadCsvData(regionCsvUrl),
       loadCsvData(classCsvUrl),
       loadCsvData(subclassCsvUrl),
       loadCsvData(archetypeCsvUrl),
@@ -868,6 +1020,8 @@ async function loadData() {
     ]);
 
     renderSourceCheckboxes();
+    renderRegionCheckboxes();
+    updateRegionModeControl();
 
     setStatusMessageText("");
     generateButton.disabled = false;
@@ -880,6 +1034,21 @@ async function loadData() {
     generateButton.disabled = true;
     retryButton.hidden = false;
   }
+}
+
+function chooseRegion(chosenBackground) {
+  const backgroundRegion = String(chosenBackground.region || "").trim();
+
+  if (backgroundRegion) {
+    return {
+      name: backgroundRegion,
+      sourceText: chosenBackground.source
+        ? `From background (${chosenBackground.source})`
+        : "From background",
+    };
+  }
+
+  return chooseRegionFromTab();
 }
 
 // ===============================
@@ -1187,10 +1356,23 @@ function generateCharacter() {
     chosenArchetype = chooseArchetype(chosenClass, chosenSubclasses, ancestry);
   }
 
+  const chosenRegion = chooseRegion(background);
+
+  if (!chosenRegion) {
+    setStatusMessageText(
+      regionModeSelect.value === "custom"
+        ? "No continents are selected for custom region rolling. Choose at least one continent."
+        : "No regions are available for the current region settings.",
+      true
+    );
+    return;
+  }
+
   currentCharacter = {
     ancestry: cloneValue(ancestry),
     heritage: cloneValue(heritage),
     background: cloneValue(background),
+    region: cloneValue(chosenRegion),
     class: cloneValue(chosenClass),
     keyAbility: cloneValue(chosenKeyAbility),
     archetype: cloneValue(chosenArchetype),
@@ -1206,6 +1388,7 @@ function generateCharacter() {
     heritage ? heritage.source : ""
   );
   setValueAndSource("backgroundResult", "backgroundSource", background.name, background.source);
+  setValueAndSource("regionResult", "regionSource", chosenRegion.name, chosenRegion.sourceText);
   setValueAndSource("classResult", "classSource", chosenClass.name, chosenClass.source);
   document.getElementById("keyAbilityResult").textContent = chosenKeyAbility.value;
   setValueAndSource(
@@ -1255,6 +1438,7 @@ generateButton.addEventListener("click", generateCharacter);
 retryButton.addEventListener("click", loadData);
 rarityFilterSelect.addEventListener("change", updateRarityModeControl);
 rarityModeSelect.addEventListener("change", updateRarityModeHint);
+regionModeSelect.addEventListener("change", updateRegionModeControl);
 sourcePresetSelect.addEventListener("change", applySourcePreset);
 archetypeToggleSelect.addEventListener("change", () => {
   if (!isArchetypeEnabled()) {
@@ -1292,5 +1476,6 @@ lockButtons.subclasses.addEventListener("click", () => toggleLock("subclasses"))
 updateLockButtons();
 initializeTheme();
 updateRarityModeControl();
+updateRegionModeControl();
 updateArchetypeVisibility();
 loadData();

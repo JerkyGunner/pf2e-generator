@@ -198,6 +198,10 @@ h1 {
   min-width: 0;
 }
 
+.control-group-wide {
+  padding: 0 16px 16px;
+}
+
 .control-input {
   width: 100%;
   min-height: 46px;
@@ -313,6 +317,10 @@ button:disabled {
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--accent-archetype);
+}
+
+.result-row-secondary-region {
+  background: var(--accent-background);
 }
 
 .result-row-secondary-archetype {
@@ -443,6 +451,23 @@ button:disabled {
   gap: 16px;
 }
 
+.region-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px 14px;
+}
+
+.region-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.region-option input {
+  margin: 0;
+}
+
 .source-group {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -570,6 +595,10 @@ button:disabled {
 
   .source-panel {
     margin: 0 14px 14px;
+  }
+
+  .control-group-wide {
+    padding: 0 14px 14px;
   }
 
   .result-card {
