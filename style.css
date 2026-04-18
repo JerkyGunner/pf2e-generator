@@ -83,14 +83,16 @@ body {
   max-width: 920px;
   margin: 40px auto;
   padding: 24px;
+  position: relative;
 }
 
 .page-header {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 16px;
   margin-bottom: 24px;
+  padding-right: 56px;
 }
 
 h1 {
@@ -104,26 +106,23 @@ h1 {
   color: var(--text-soft);
 }
 
-.theme-control {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 120px;
-}
-
-.theme-label {
-  font-size: 13px;
-  font-weight: bold;
-  color: var(--text-soft);
-}
-
-.theme-select {
-  padding: 10px 12px;
-  font: inherit;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+.theme-toggle {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
   background: var(--panel);
   color: var(--text);
+  box-shadow: var(--shadow-soft);
 }
 
 .status-message {
@@ -385,6 +384,12 @@ button:disabled {
   align-items: center;
 }
 
+.source-popover {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
 .source-button {
   width: 24px;
   height: 24px;
@@ -398,9 +403,39 @@ button:disabled {
   line-height: 1;
 }
 
-.source-button:hover {
+.source-button:hover,
+.source-button:focus-visible {
   background: var(--panel-soft);
   color: var(--text);
+}
+
+.source-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translate(-50%, 6px);
+  min-width: max-content;
+  max-width: 220px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-soft);
+  font-size: 13px;
+  line-height: 1.4;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+  z-index: 10;
+}
+
+.source-popover:hover .source-tooltip,
+.source-popover:focus-within .source-tooltip,
+.source-popover.is-open .source-tooltip {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
 }
 
 .source-groups {
@@ -521,10 +556,12 @@ button:disabled {
   .page-header {
     flex-direction: column;
     align-items: stretch;
+    padding-right: 0;
   }
 
-  .theme-control {
-    max-width: 180px;
+  .theme-toggle {
+    top: 16px;
+    right: 16px;
   }
 
   .options-content {

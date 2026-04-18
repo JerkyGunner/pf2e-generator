@@ -53,7 +53,7 @@ const accessFilterSelect = document.getElementById("accessFilter");
 const archetypeToggleSelect = document.getElementById("archetypeToggle");
 const sourcePresetSelect = document.getElementById("sourcePreset");
 const sourceCheckboxGroups = document.getElementById("sourceCheckboxGroups");
-const themeSelect = document.getElementById("themeSelect");
+const themeToggle = document.getElementById("themeToggle");
 const rarityModeHint = document.getElementById("rarityModeHint");
 const statusMessage = document.getElementById("statusMessage");
 const archetypeSection = document.getElementById("archetypeSection");
@@ -125,16 +125,27 @@ function updateRarityModeHint() {
 function applyTheme(theme) {
   if (theme === "dark" || theme === "light") {
     document.body.dataset.theme = theme;
+    updateThemeToggle(theme);
     return;
   }
 
   document.body.removeAttribute("data-theme");
+  updateThemeToggle(getSystemTheme());
+}
+
+function getSystemTheme() {
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function updateThemeToggle(theme) {
+  const isDarkTheme = theme === "dark";
+  themeToggle.innerHTML = isDarkTheme ? "&#9790;" : "&#9728;";
+  themeToggle.setAttribute("aria-label", isDarkTheme ? "Switch to light theme" : "Switch to dark theme");
 }
 
 function initializeTheme() {
-  const savedTheme = localStorage.getItem(themeStorageKey) || "system";
-  themeSelect.value = savedTheme;
-  applyTheme(savedTheme);
+  const savedTheme = localStorage.getItem(themeStorageKey);
+  applyTheme(savedTheme || getSystemTheme());
 }
 
 function setStatusMessageText(message, isError = false) {
@@ -149,13 +160,37 @@ function createSourceButton(sourceText) {
     return null;
   }
 
+  const sourcePopover = document.createElement("span");
+  sourcePopover.className = "source-popover";
+
   const sourceButton = document.createElement("button");
   sourceButton.type = "button";
   sourceButton.className = "source-button";
   sourceButton.textContent = "i";
-  sourceButton.title = normalizedSourceText;
   sourceButton.setAttribute("aria-label", `Source: ${normalizedSourceText}`);
-  return sourceButton;
+  sourceButton.setAttribute("aria-expanded", "false");
+
+  const sourceTooltip = document.createElement("span");
+  sourceTooltip.className = "source-tooltip";
+  sourceTooltip.textContent = normalizedSourceText;
+
+  sourceButton.addEventListener("click", event => {
+    event.stopPropagation();
+    const willOpen = !sourcePopover.classList.contains("is-open");
+    document.querySelectorAll(".source-popover.is-open").forEach(popover => {
+      popover.classList.remove("is-open");
+      const button = popover.querySelector(".source-button");
+      if (button) {
+        button.setAttribute("aria-expanded", "false");
+      }
+    });
+    sourcePopover.classList.toggle("is-open", willOpen);
+    sourceButton.setAttribute("aria-expanded", String(willOpen));
+  });
+
+  sourcePopover.appendChild(sourceButton);
+  sourcePopover.appendChild(sourceTooltip);
+  return sourcePopover;
 }
 
 function setValueAndSource(resultId, sourceId, valueText, sourceText) {
@@ -186,6 +221,13 @@ function isTrueValue(value) {
 
 function isArchetypeEnabled() {
   return archetypeToggleSelect.value === "on";
+}
+
+function splitCsvValues(value) {
+  return String(value || "")
+    .split(",")
+    .map(item => item.trim().toLowerCase())
+    .filter(item => item !== "");
 }
 
 function updateArchetypeVisibility() {
@@ -262,13 +304,50 @@ function matchesOptionalRequirement(requiredValue, actualValue) {
   return normalizedRequiredValue === String(actualValue || "").trim().toLowerCase();
 }
 
-function filterArchetypesForCharacter(chosenClass, chosenAncestry) {
+function getSpellcastingProfile(chosenClass, chosenSubclasses) {
+  const classTraditions = splitCsvValues(chosenClass.base_tradition);
+  const subclassTraditions = chosenSubclasses.flatMap(subclass =>
+    splitCsvValues(subclass.tradition)
+  );
+  const allTraditions = [...new Set([...classTraditions, ...subclassTraditions])];
+
+  return {
+    isSpellcaster: isTrueValue(chosenClass.is_spellcaster),
+    traditions: allTraditions,
+    style: String(chosenClass.spellcasting_style || "").trim().toLowerCase(),
+  };
+}
+
+function archetypeAllowsTradition(archetype, spellcastingProfile) {
+  const allowedTraditions = splitCsvValues(archetype.allowed_traditions);
+
+  if (allowedTraditions.length === 0) {
+    return true;
+  }
+
+  return allowedTraditions.some(tradition => spellcastingProfile.traditions.includes(tradition));
+}
+
+function filterArchetypesForCharacter(chosenClass, chosenSubclasses, chosenAncestry) {
+  const spellcastingProfile = getSpellcastingProfile(chosenClass, chosenSubclasses);
+
   return applyActiveFilters(archetypes).filter(archetype => {
     if (String(archetype.name).trim().toLowerCase() === String(chosenClass.name).trim().toLowerCase()) {
       return false;
     }
 
-    if (isTrueValue(archetype.requires_spellcasting) && !isTrueValue(chosenClass.is_spellcaster)) {
+    if (isTrueValue(archetype.requires_spellcasting) && !spellcastingProfile.isSpellcaster) {
+      return false;
+    }
+
+    if (!archetypeAllowsTradition(archetype, spellcastingProfile)) {
+      return false;
+    }
+
+    if (
+      archetype.required_spellcasting_style &&
+      String(archetype.required_spellcasting_style).trim().toLowerCase() !== spellcastingProfile.style
+    ) {
       return false;
     }
 
@@ -284,12 +363,12 @@ function filterArchetypesForCharacter(chosenClass, chosenAncestry) {
   });
 }
 
-function chooseArchetype(chosenClass, chosenAncestry) {
+function chooseArchetype(chosenClass, chosenSubclasses, chosenAncestry) {
   if (!isArchetypeEnabled()) {
     return null;
   }
 
-  const matchingArchetypes = filterArchetypesForCharacter(chosenClass, chosenAncestry);
+  const matchingArchetypes = filterArchetypesForCharacter(chosenClass, chosenSubclasses, chosenAncestry);
 
   if (matchingArchetypes.length === 0) {
     return null;
@@ -1058,7 +1137,7 @@ function generateCharacter() {
   }
 
   if (!chosenArchetype) {
-    chosenArchetype = chooseArchetype(chosenClass, ancestry);
+    chosenArchetype = chooseArchetype(chosenClass, chosenSubclasses, ancestry);
   }
 
   currentCharacter = {
@@ -1138,10 +1217,23 @@ archetypeToggleSelect.addEventListener("change", () => {
 
   updateArchetypeVisibility();
 });
-themeSelect.addEventListener("change", event => {
-  const theme = event.target.value;
+themeToggle.addEventListener("click", () => {
+  const theme = document.body.dataset.theme === "dark" ? "light" : "dark";
   localStorage.setItem(themeStorageKey, theme);
   applyTheme(theme);
+});
+document.addEventListener("click", event => {
+  if (event.target.closest(".source-popover")) {
+    return;
+  }
+
+  document.querySelectorAll(".source-popover.is-open").forEach(popover => {
+    popover.classList.remove("is-open");
+    const button = popover.querySelector(".source-button");
+    if (button) {
+      button.setAttribute("aria-expanded", "false");
+    }
+  });
 });
 lockButtons.ancestry.addEventListener("click", () => toggleLock("ancestry"));
 lockButtons.heritage.addEventListener("click", () => toggleLock("heritage"));
