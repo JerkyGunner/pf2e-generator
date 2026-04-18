@@ -260,7 +260,7 @@ function normalizeAccess(item) {
 function filterByAccess(array) {
   const accessFilter = accessFilterSelect.value;
 
-  if (accessFilter === "all") {
+  if (accessFilter === "all" || hasAdventureSourcesSelected()) {
     return array;
   }
 
@@ -284,6 +284,15 @@ function getSelectedSourceNames() {
   return new Set([...checkedInputs].map(input => input.value));
 }
 
+function hasAdventureSourcesSelected() {
+  const selectedSourceNames = getSelectedSourceNames();
+
+  return sourceDefinitions.some(source =>
+    selectedSourceNames.has(source.source_name) &&
+    (source.category === "Adventure Path" || source.category === "Adventure Module")
+  );
+}
+
 function filterBySource(array) {
   const selectedSourceNames = getSelectedSourceNames();
 
@@ -304,6 +313,16 @@ function matchesOptionalRequirement(requiredValue, actualValue) {
   return normalizedRequiredValue === String(actualValue || "").trim().toLowerCase();
 }
 
+function matchesOptionalListRequirement(requiredValue, actualValue) {
+  const allowedValues = splitCsvValues(requiredValue);
+
+  if (allowedValues.length === 0) {
+    return true;
+  }
+
+  return allowedValues.includes(String(actualValue || "").trim().toLowerCase());
+}
+
 function getSpellcastingProfile(chosenClass, chosenSubclasses) {
   const classTraditions = splitCsvValues(chosenClass.base_tradition);
   const subclassTraditions = chosenSubclasses.flatMap(subclass =>
@@ -315,6 +334,12 @@ function getSpellcastingProfile(chosenClass, chosenSubclasses) {
     isSpellcaster: isTrueValue(chosenClass.is_spellcaster),
     traditions: allTraditions,
     style: String(chosenClass.spellcasting_style || "").trim().toLowerCase(),
+  };
+}
+
+function getClassFeatureProfile(chosenClass) {
+  return {
+    hasFocusSpells: isTrueValue(chosenClass.focus_spells),
   };
 }
 
@@ -330,6 +355,7 @@ function archetypeAllowsTradition(archetype, spellcastingProfile) {
 
 function filterArchetypesForCharacter(chosenClass, chosenSubclasses, chosenAncestry) {
   const spellcastingProfile = getSpellcastingProfile(chosenClass, chosenSubclasses);
+  const classFeatureProfile = getClassFeatureProfile(chosenClass);
 
   return applyActiveFilters(archetypes).filter(archetype => {
     if (String(archetype.name).trim().toLowerCase() === String(chosenClass.name).trim().toLowerCase()) {
@@ -355,7 +381,11 @@ function filterArchetypesForCharacter(chosenClass, chosenSubclasses, chosenAnces
       return false;
     }
 
-    if (!matchesOptionalRequirement(archetype.required_ancestry, chosenAncestry.name)) {
+    if (!matchesOptionalListRequirement(archetype.required_ancestry, chosenAncestry.name)) {
+      return false;
+    }
+
+    if (isTrueValue(archetype.requires_focus_spells) && !classFeatureProfile.hasFocusSpells) {
       return false;
     }
 
@@ -409,8 +439,17 @@ function syncSelectionsFromLockedArchetype(chosenArchetype, chosenClass, chosenA
   }
 
   if (!chosenAncestry && chosenArchetype.required_ancestry) {
-    chosenAncestry =
-      findAncestryByName(chosenArchetype.required_ancestry) || { name: chosenArchetype.required_ancestry };
+    const allowedAncestries = applyActiveFilters(ancestries).filter(ancestryOption =>
+      matchesOptionalListRequirement(chosenArchetype.required_ancestry, ancestryOption.name)
+    );
+
+    if (allowedAncestries.length > 0) {
+      chosenAncestry = weightedRandomItem(allowedAncestries);
+    } else {
+      const firstRequiredAncestry = String(chosenArchetype.required_ancestry).split(",")[0].trim();
+      chosenAncestry =
+        findAncestryByName(firstRequiredAncestry) || { name: firstRequiredAncestry };
+    }
   }
 
   if (!chosenClass) {
@@ -424,6 +463,14 @@ function syncSelectionsFromLockedArchetype(chosenArchetype, chosenClass, chosenA
 
       if (spellcastingClasses.length > 0) {
         chosenClass = weightedRandomItem(spellcastingClasses);
+      }
+    } else if (isTrueValue(chosenArchetype.requires_focus_spells)) {
+      const focusSpellClasses = applyActiveFilters(classes).filter(characterClass =>
+        isTrueValue(characterClass.focus_spells)
+      );
+
+      if (focusSpellClasses.length > 0) {
+        chosenClass = weightedRandomItem(focusSpellClasses);
       }
     }
   }
