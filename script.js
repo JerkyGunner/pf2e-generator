@@ -46,6 +46,7 @@ const lockedSelections = {
   ancestry: null,
   heritage: null,
   background: null,
+  region: null,
   class: null,
   keyAbility: null,
   deity: null,
@@ -83,6 +84,7 @@ const lockButtons = {
   ancestry: document.getElementById("lockAncestryBtn"),
   heritage: document.getElementById("lockHeritageBtn"),
   background: document.getElementById("lockBackgroundBtn"),
+  region: document.getElementById("lockRegionBtn"),
   class: document.getElementById("lockClassBtn"),
   keyAbility: document.getElementById("lockKeyAbilityBtn"),
   deity: document.getElementById("lockDeityBtn"),
@@ -756,25 +758,12 @@ function getCurrentDeityWeightingItems() {
     "Current bucket weights: Gods of the Inner Sea 10, Regional 10, Ancestral 8, Pantheon 3, Faiths & Philosophies 2, Other Gods 3, Remaining Gods 1, None 5.",
   ];
 
-  const regionalCategory = isRegionEnabled()
-    ? getRegionalDeityCategory(currentCharacter?.region)
-    : "";
-  const ancestralCategory = getAncestralDeityCategory(currentCharacter?.ancestry);
-
   if (!isRegionEnabled()) {
     items.push("Region is turned off, so deity rolls get no regional deity bonus.");
   } else {
-    items.push(
-      regionalCategory
-        ? `Regional bucket currently means ${regionalCategory}.`
-        : "Regional bucket is only used for Garund or Tian Xia regions."
-    );
+    items.push("Regional bucket means Mwangi Gods for Garund regions and Tian Gods for Tian Xia regions.");
   }
-  items.push(
-    ancestralCategory
-      ? `Ancestral bucket currently means ${ancestralCategory}.`
-      : "Ancestral bucket only applies to Dwarf, Elf, Goblin, or Orc characters."
-  );
+  items.push("Ancestral bucket means Dwarven Gods for Dwarves, Elven Gods for Elves, Goblin Gods for Goblins, and Orc Gods for Orcs.");
 
   return items;
 }
@@ -1318,6 +1307,27 @@ function chooseRegion(chosenBackground) {
   return chooseRegionFromTab();
 }
 
+function isBackgroundCompatibleWithRegion(backgroundOption, chosenRegion) {
+  if (!chosenRegion) {
+    return true;
+  }
+
+  const backgroundRegion = String(backgroundOption.region || "").trim();
+  const backgroundContinent = String(backgroundOption.continent || "").trim();
+  const chosenRegionName = String(chosenRegion.name || "").trim().toLowerCase();
+  const chosenContinentName = normalizeContinentName(chosenRegion.continent).toLowerCase();
+
+  if (backgroundRegion) {
+    return backgroundRegion.toLowerCase() === chosenRegionName;
+  }
+
+  if (backgroundContinent) {
+    return backgroundContinent.toLowerCase() === chosenContinentName;
+  }
+
+  return true;
+}
+
 // ===============================
 // DEITY LOGIC
 // ===============================
@@ -1765,6 +1775,7 @@ function generateCharacter() {
   let ancestry = lockedSelections.ancestry;
   let heritage = lockedSelections.heritage;
   let background = lockedSelections.background;
+  let chosenRegion = isRegionEnabled() ? lockedSelections.region : null;
   let chosenClass = lockedSelections.class;
   let chosenSubclasses = lockedSelections.subclasses;
   let chosenKeyAbility = lockedSelections.keyAbility;
@@ -1791,6 +1802,14 @@ function generateCharacter() {
       findClassByName(chosenSubclasses[0].class) || { name: chosenSubclasses[0].class };
   }
 
+  if (background && chosenRegion && !isBackgroundCompatibleWithRegion(background, chosenRegion)) {
+    setStatusMessageText(
+      "The locked Background and locked Region do not match. Unlock one of them to continue.",
+      true
+    );
+    return;
+  }
+
   // Pick the main character pieces in dependency order so later choices have
   // the information they need: heritage needs ancestry, subclasses need class,
   // and key ability may depend on subclass details.
@@ -1810,7 +1829,21 @@ function generateCharacter() {
 
   // Pick background
   if (!background) {
-    background = weightedRandomItem(availableBackgrounds);
+    const compatibleBackgrounds = chosenRegion
+      ? availableBackgrounds.filter(backgroundOption =>
+          isBackgroundCompatibleWithRegion(backgroundOption, chosenRegion)
+        )
+      : availableBackgrounds;
+
+    if (compatibleBackgrounds.length === 0) {
+      setStatusMessageText(
+        "No backgrounds match the locked Region and current filters. Unlock Region or allow more options.",
+        true
+      );
+      return;
+    }
+
+    background = weightedRandomItem(compatibleBackgrounds);
   }
 
   // Pick class
@@ -1835,7 +1868,9 @@ function generateCharacter() {
     chosenArchetype = chooseArchetype(chosenClass, chosenSubclasses, ancestry);
   }
 
-  const chosenRegion = chooseRegion(background);
+  if (!chosenRegion) {
+    chosenRegion = chooseRegion(background);
+  }
 
   if (isRegionEnabled() && !chosenRegion) {
     setStatusMessageText(
@@ -1943,6 +1978,11 @@ rarityModeSelect.addEventListener("change", () => {
   updateWeightingGuide();
 });
 regionToggleSelect.addEventListener("change", () => {
+  if (!isRegionEnabled()) {
+    lockedSelections.region = null;
+    updateLockButtons();
+  }
+
   updateRegionModeControl();
   updateSecondaryResultsVisibility();
   updateWeightingGuide();
@@ -1992,6 +2032,7 @@ document.addEventListener("click", event => {
 lockButtons.ancestry.addEventListener("click", () => toggleLock("ancestry"));
 lockButtons.heritage.addEventListener("click", () => toggleLock("heritage"));
 lockButtons.background.addEventListener("click", () => toggleLock("background"));
+lockButtons.region.addEventListener("click", () => toggleLock("region"));
 lockButtons.class.addEventListener("click", () => toggleLock("class"));
 lockButtons.keyAbility.addEventListener("click", () => toggleLock("keyAbility"));
 lockButtons.deity.addEventListener("click", () => toggleLock("deity"));
