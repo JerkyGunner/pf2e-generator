@@ -37,7 +37,6 @@
             <option value="light">Balanced (Common 4, Uncommon 3, Rare 2)</option>
             <option value="off">Pure Random (All rarities 1)</option>
           </select>
-          <p id="rarityModeHint" class="control-hint"></p>
         </div>
 
         <div class="control-group">
@@ -50,14 +49,30 @@
         </div>
 
         <div class="control-group">
+          <label for="regionToggle" class="label">Region</label>
+          <select id="regionToggle" class="control-input">
+            <option value="on" selected>Roll Region</option>
+            <option value="off">Turn Region Off</option>
+          </select>
+        </div>
+
+        <div class="control-group">
           <label for="archetypeToggle" class="label">Archetypes</label>
           <select id="archetypeToggle" class="control-input">
-            <option value="on" selected>Roll Archetypes</option>
+            <option value="on" selected>Roll Archetype</option>
             <option value="off">Turn Archetypes Off</option>
           </select>
         </div>
 
         <div class="control-group">
+          <label for="deityToggle" class="label">Deities</label>
+          <select id="deityToggle" class="control-input">
+            <option value="on" selected>Roll Deity</option>
+            <option value="off">Turn Deities Off</option>
+          </select>
+        </div>
+
+        <div id="regionModeGroup" class="control-group">
           <label for="regionMode" class="label">Region Weighting</label>
           <select id="regionMode" class="control-input">
             <option value="inner-sea" selected>Default (Inner Sea)</option>
@@ -73,6 +88,32 @@
         <span class="label">Custom Continents</span>
         <div id="regionCheckboxGroups" class="region-groups"></div>
       </div>
+
+      <details class="weighting-panel">
+        <summary class="weighting-summary">Weighting Guide</summary>
+
+        <div class="weighting-content">
+          <details class="weighting-group">
+            <summary class="weighting-group-summary">Rarity</summary>
+            <div id="rarityWeightingGuide" class="weighting-list weighting-group-content"></div>
+          </details>
+
+          <details class="weighting-group">
+            <summary class="weighting-group-summary">Region</summary>
+            <div id="regionWeightingGuide" class="weighting-list weighting-group-content"></div>
+          </details>
+
+          <details class="weighting-group">
+            <summary class="weighting-group-summary">Deity</summary>
+            <div id="deityWeightingGuide" class="weighting-list weighting-group-content"></div>
+          </details>
+
+          <details class="weighting-group">
+            <summary class="weighting-group-summary">Archetype</summary>
+            <div id="archetypeWeightingGuide" class="weighting-list weighting-group-content"></div>
+          </details>
+        </div>
+      </details>
 
       <details class="source-panel">
         <summary class="source-summary">Source Selection</summary>
@@ -171,31 +212,46 @@
         </div>
       </div>
 
-      <div class="result-divider" aria-hidden="true"></div>
+      <div id="secondaryResultsSection" class="secondary-results-section">
+        <div class="result-divider" aria-hidden="true"></div>
 
-      <div class="result-grid result-grid-secondary">
-        <div class="result-column">
-          <div class="result-row result-row-secondary result-row-secondary-region">
-            <div class="result-header">
-              <span class="label">Region</span>
-            </div>
-            <div class="value-row">
-              <span id="regionResult" class="value">-</span>
-              <span id="regionSource" class="source-slot"></span>
-            </div>
-          </div>
-        </div>
-
-        <div class="result-column">
-          <div id="archetypeSection" class="archetype-section">
-            <div id="archetypeRow" class="result-row result-row-secondary result-row-secondary-archetype">
+        <div class="result-grid result-grid-secondary">
+          <div id="optionalLeftColumn" class="result-column">
+            <div id="regionSection" class="result-row result-row-secondary result-row-secondary-region">
               <div class="result-header">
-                <span class="label">Archetype</span>
-                <button id="lockArchetypeBtn" class="lock-button" type="button">Lock</button>
+                <span class="label">Region</span>
               </div>
               <div class="value-row">
-                <span id="archetypeResult" class="value">-</span>
-                <span id="archetypeSource" class="source-slot"></span>
+                <span id="regionResult" class="value">-</span>
+                <span id="regionSource" class="source-slot"></span>
+              </div>
+            </div>
+
+            <div id="deitySection" class="deity-section">
+              <div class="result-row result-row-secondary result-row-secondary-deity">
+                <div class="result-header">
+                  <span class="label">Deity</span>
+                  <button id="lockDeityBtn" class="lock-button" type="button">Lock</button>
+                </div>
+                <div class="value-row deity-value-row">
+                  <span id="deityResult" class="value">-</span>
+                  <span id="deitySource" class="source-slot"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="optionalRightColumn" class="result-column">
+            <div id="archetypeSection" class="archetype-section">
+              <div id="archetypeRow" class="result-row result-row-secondary result-row-secondary-archetype">
+                <div class="result-header">
+                  <span class="label">Archetype</span>
+                  <button id="lockArchetypeBtn" class="lock-button" type="button">Lock</button>
+                </div>
+                <div class="value-row">
+                  <span id="archetypeResult" class="value">-</span>
+                  <span id="archetypeSource" class="source-slot"></span>
+                </div>
               </div>
             </div>
           </div>

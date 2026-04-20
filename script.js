@@ -13,6 +13,9 @@ const backgroundCsvUrl =
 const regionCsvUrl =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=1217750278&single=true&output=csv";
 
+const deityCsvUrl =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=1202849080&single=true&output=csv";
+
 const classCsvUrl =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=982187207&single=true&output=csv";
 
@@ -32,6 +35,7 @@ let ancestries = [];
 let heritages = [];
 let backgrounds = [];
 let regions = [];
+let deities = [];
 let classes = [];
 let subclasses = [];
 let archetypes = [];
@@ -44,6 +48,7 @@ const lockedSelections = {
   background: null,
   class: null,
   keyAbility: null,
+  deity: null,
   archetype: null,
   subclasses: null,
 };
@@ -54,16 +59,25 @@ const rarityFilterSelect = document.getElementById("rarityFilter");
 const rarityModeGroup = document.getElementById("rarityModeGroup");
 const rarityModeSelect = document.getElementById("rarityMode");
 const accessFilterSelect = document.getElementById("accessFilter");
+const regionToggleSelect = document.getElementById("regionToggle");
 const archetypeToggleSelect = document.getElementById("archetypeToggle");
+const deityToggleSelect = document.getElementById("deityToggle");
+const regionModeGroup = document.getElementById("regionModeGroup");
 const regionModeSelect = document.getElementById("regionMode");
 const sourcePresetSelect = document.getElementById("sourcePreset");
 const sourceCheckboxGroups = document.getElementById("sourceCheckboxGroups");
 const customRegionGroup = document.getElementById("customRegionGroup");
 const regionCheckboxGroups = document.getElementById("regionCheckboxGroups");
 const themeToggle = document.getElementById("themeToggle");
-const rarityModeHint = document.getElementById("rarityModeHint");
 const regionModeHint = document.getElementById("regionModeHint");
+const rarityWeightingGuide = document.getElementById("rarityWeightingGuide");
+const regionWeightingGuide = document.getElementById("regionWeightingGuide");
+const deityWeightingGuide = document.getElementById("deityWeightingGuide");
+const archetypeWeightingGuide = document.getElementById("archetypeWeightingGuide");
 const statusMessage = document.getElementById("statusMessage");
+const secondaryResultsSection = document.getElementById("secondaryResultsSection");
+const regionSection = document.getElementById("regionSection");
+const deitySection = document.getElementById("deitySection");
 const archetypeSection = document.getElementById("archetypeSection");
 const lockButtons = {
   ancestry: document.getElementById("lockAncestryBtn"),
@@ -71,6 +85,7 @@ const lockButtons = {
   background: document.getElementById("lockBackgroundBtn"),
   class: document.getElementById("lockClassBtn"),
   keyAbility: document.getElementById("lockKeyAbilityBtn"),
+  deity: document.getElementById("lockDeityBtn"),
   archetype: document.getElementById("lockArchetypeBtn"),
   subclasses: document.getElementById("lockSubclassesBtn"),
 };
@@ -133,10 +148,6 @@ function getCurrentThemeOptionLabel() {
   return rarityModeSelect.options[rarityModeSelect.selectedIndex]?.textContent || "";
 }
 
-function updateRarityModeHint() {
-  rarityModeHint.textContent = getCurrentThemeOptionLabel();
-}
-
 function updateRegionModeHint() {
   regionModeHint.textContent = regionModeOptions[regionModeSelect.value] || "";
 }
@@ -163,6 +174,8 @@ function updateThemeToggle(theme) {
 }
 
 function initializeTheme() {
+  // Save the user's explicit light/dark choice, but if they never picked one,
+  // fall back to whatever their device theme is using.
   const savedTheme = localStorage.getItem(themeStorageKey);
   applyTheme(savedTheme || getSystemTheme());
 }
@@ -230,6 +243,13 @@ function normalizeSourceName(value) {
   return String(value || "").trim();
 }
 
+function splitSourceValues(value) {
+  return String(value || "")
+    .split(",")
+    .map(source => normalizeSourceName(source))
+    .filter(source => source !== "");
+}
+
 function normalizeContinentName(value) {
   return String(value || "").trim();
 }
@@ -246,6 +266,14 @@ function isArchetypeEnabled() {
   return archetypeToggleSelect.value === "on";
 }
 
+function isDeityEnabled() {
+  return deityToggleSelect.value === "on";
+}
+
+function isRegionEnabled() {
+  return regionToggleSelect.value === "on";
+}
+
 function splitCsvValues(value) {
   return String(value || "")
     .split(",")
@@ -257,7 +285,15 @@ function getAvailableRegions() {
   return regions.filter(region => String(region.name || "").trim() !== "");
 }
 
+function findRegionByName(name) {
+  return regions.find(
+    region => String(region.name).trim().toLowerCase() === String(name).trim().toLowerCase()
+  ) || null;
+}
+
 function getAvailableContinents() {
+  // Regions are rolled from continents first, so we keep a clean list of
+  // unique continent names pulled straight from the Regions sheet.
   return [...new Set(
     getAvailableRegions()
       .map(region => normalizeContinentName(region.continent))
@@ -267,6 +303,22 @@ function getAvailableContinents() {
 
 function updateArchetypeVisibility() {
   archetypeSection.hidden = !isArchetypeEnabled();
+}
+
+function updateDeityVisibility() {
+  deitySection.hidden = !isDeityEnabled();
+}
+
+function updateSecondaryResultsVisibility() {
+  regionSection.hidden = !isRegionEnabled();
+  updateDeityVisibility();
+  updateArchetypeVisibility();
+
+  const hasLeftColumnContent = isRegionEnabled() || isDeityEnabled();
+  const hasRightColumnContent = isArchetypeEnabled();
+
+  deitySection.classList.toggle("is-first-visible", !isRegionEnabled() && isDeityEnabled());
+  secondaryResultsSection.hidden = !hasLeftColumnContent && !hasRightColumnContent;
 }
 
 function getAllowedRarities() {
@@ -295,6 +347,8 @@ function normalizeAccess(item) {
 function filterByAccess(array) {
   const accessFilter = accessFilterSelect.value;
 
+  // Adventure material often has Society flags that we still want to allow
+  // when the user has explicitly included Adventure Path or Module sources.
   if (accessFilter === "all" || hasAdventureSourcesSelected()) {
     return array;
   }
@@ -310,7 +364,15 @@ function filterByAccess(array) {
   });
 }
 
+function applyAccessAndSourceFilters(array) {
+  return filterBySource(filterByAccess(array));
+}
+
 function applyActiveFilters(array) {
+  // Most sheet-backed data goes through the same three filters:
+  // 1. rarity
+  // 2. Society access
+  // 3. selected sources
   return filterBySource(filterByAccess(filterByAllowedRarities(array)));
 }
 
@@ -335,7 +397,15 @@ function filterBySource(array) {
     return [];
   }
 
-  return array.filter(item => selectedSourceNames.has(normalizeSourceName(item.source)));
+  return array.filter(item => {
+    const itemSources = splitSourceValues(item.source);
+
+    if (itemSources.length === 0) {
+      return false;
+    }
+
+    return itemSources.some(source => selectedSourceNames.has(source));
+  });
 }
 
 function matchesOptionalRequirement(requiredValue, actualValue) {
@@ -359,6 +429,8 @@ function matchesOptionalListRequirement(requiredValue, actualValue) {
 }
 
 function getSpellcastingProfile(chosenClass, chosenSubclasses) {
+  // Some classes define their tradition directly, while others leave it to
+  // subclasses. We combine both so archetype checks can use one simple profile.
   const classTraditions = splitCsvValues(chosenClass.base_tradition);
   const subclassTraditions = chosenSubclasses.flatMap(subclass =>
     splitCsvValues(subclass.tradition)
@@ -392,6 +464,8 @@ function filterArchetypesForCharacter(chosenClass, chosenSubclasses, chosenAnces
   const spellcastingProfile = getSpellcastingProfile(chosenClass, chosenSubclasses);
   const classFeatureProfile = getClassFeatureProfile(chosenClass);
 
+  // This is the "can this archetype legally fit this character?" gate.
+  // Every requirement column on the Archetypes sheet is checked here.
   return applyActiveFilters(archetypes).filter(archetype => {
     if (String(archetype.name).trim().toLowerCase() === String(chosenClass.name).trim().toLowerCase()) {
       return false;
@@ -445,6 +519,8 @@ function chooseArchetype(chosenClass, chosenSubclasses, chosenAncestry) {
   const otherArchetypes = matchingArchetypes.filter(
     archetype => String(archetype.type).trim().toLowerCase() === "other"
   );
+  // The user wanted Class vs Other to be a 50/50 split first, and only then
+  // should rarity weighting decide which archetype wins inside that bucket.
   const chooseClassArchetype = Math.random() < 0.5;
   const preferredPool = chooseClassArchetype ? classArchetypes : otherArchetypes;
   const fallbackPool = chooseClassArchetype ? otherArchetypes : classArchetypes;
@@ -583,9 +659,143 @@ function renderRegionCheckboxes() {
 }
 
 function updateRegionModeControl() {
-  const isCustomMode = regionModeSelect.value === "custom";
+  const regionEnabled = isRegionEnabled();
+  // Only show continent checkboxes when the user has chosen the fully manual
+  // region mode. The other presets decide the weights automatically.
+  const isCustomMode = regionEnabled && regionModeSelect.value === "custom";
+  regionModeGroup.hidden = !regionEnabled;
+  regionModeSelect.disabled = !regionEnabled;
   customRegionGroup.hidden = !isCustomMode;
   updateRegionModeHint();
+}
+
+function renderWeightingItems(container, items) {
+  container.replaceChildren();
+
+  items.forEach(text => {
+    const item = document.createElement("div");
+    item.className = "weighting-item";
+    item.textContent = text;
+    container.appendChild(item);
+  });
+}
+
+function getCurrentRarityWeightingItems() {
+  const allowedRarities = getAllowedRarities();
+
+  if (allowedRarities.length === 1) {
+    return [
+      "Only common entries can be rolled.",
+      "This applies to ancestries, heritages, backgrounds, classes, subclasses, and archetypes.",
+    ];
+  }
+
+  if (rarityModeSelect.value === "off") {
+    return [
+      `Allowed rarities: ${allowedRarities.join(", ")}.`,
+      "Every allowed rarity is treated equally.",
+    ];
+  }
+
+  if (rarityModeSelect.value === "light") {
+    return [
+      `Allowed rarities: ${allowedRarities.join(", ")}.`,
+      allowedRarities.includes("rare")
+        ? "Current weights: Common 4, Uncommon 3, Rare 2."
+        : "Current weights: Common 4, Uncommon 3.",
+    ];
+  }
+
+  return [
+    `Allowed rarities: ${allowedRarities.join(", ")}.`,
+    allowedRarities.includes("rare")
+      ? "Current weights: Common 10, Uncommon 3, Rare 1."
+      : "Current weights: Common 6, Uncommon 3.",
+  ];
+}
+
+function getCurrentRegionWeightingItems() {
+  if (!isRegionEnabled()) {
+    return [
+      "Region is turned off, so no Region card is rolled or shown.",
+      "If Deities are still on, they do not get any regional deity bonus.",
+    ];
+  }
+
+  const items = [
+    "If a background already has a region, that region is used directly.",
+    "If a background only has a continent, the generator keeps that continent and rolls a region inside it.",
+    "If a background has neither, the generator rolls a continent first and then a region inside it.",
+  ];
+
+  if (regionModeSelect.value === "inner-sea") {
+    items.push("Current continent weights: Avistan 3, Garund 3, all other continents 1.");
+  } else if (regionModeSelect.value === "explore") {
+    items.push("Current continent weights: Avistan 1, Garund 1, all other continents 3.");
+  } else if (regionModeSelect.value === "balanced") {
+    items.push("Current continent weights: all continents 1.");
+  } else {
+    const selectedContinents = [...getSelectedCustomContinents()];
+    items.push(
+      selectedContinents.length > 0
+        ? `Custom mode: only these continents can be rolled, all equally: ${selectedContinents.join(", ")}.`
+        : "Custom mode: no continents are currently selected."
+    );
+  }
+
+  return items;
+}
+
+function getCurrentDeityWeightingItems() {
+  if (!isDeityEnabled()) {
+    return ["Deity rolling is currently turned off."];
+  }
+
+  const items = [
+    "The generator rolls a deity bucket first, then rolls a deity inside that bucket.",
+    "Current bucket weights: Gods of the Inner Sea 10, Regional 10, Ancestral 8, Pantheon 3, Faiths & Philosophies 2, Other Gods 3, Remaining Gods 1, None 5.",
+  ];
+
+  const regionalCategory = isRegionEnabled()
+    ? getRegionalDeityCategory(currentCharacter?.region)
+    : "";
+  const ancestralCategory = getAncestralDeityCategory(currentCharacter?.ancestry);
+
+  if (!isRegionEnabled()) {
+    items.push("Region is turned off, so deity rolls get no regional deity bonus.");
+  } else {
+    items.push(
+      regionalCategory
+        ? `Regional bucket currently means ${regionalCategory}.`
+        : "Regional bucket is only used for Garund or Tian Xia regions."
+    );
+  }
+  items.push(
+    ancestralCategory
+      ? `Ancestral bucket currently means ${ancestralCategory}.`
+      : "Ancestral bucket only applies to Dwarf, Elf, Goblin, or Orc characters."
+  );
+
+  return items;
+}
+
+function getCurrentArchetypeWeightingItems() {
+  if (!isArchetypeEnabled()) {
+    return ["Archetype rolling is currently turned off."];
+  }
+
+  return [
+    "The generator first tries a 50/50 split between Class archetypes and Other archetypes.",
+    "If the chosen side has no valid archetypes, it falls back to the other side.",
+    "Inside the final side, the current rarity weighting is used to choose the archetype.",
+  ];
+}
+
+function updateWeightingGuide() {
+  renderWeightingItems(rarityWeightingGuide, getCurrentRarityWeightingItems());
+  renderWeightingItems(regionWeightingGuide, getCurrentRegionWeightingItems());
+  renderWeightingItems(deityWeightingGuide, getCurrentDeityWeightingItems());
+  renderWeightingItems(archetypeWeightingGuide, getCurrentArchetypeWeightingItems());
 }
 
 function getSelectedCustomContinents() {
@@ -600,6 +810,8 @@ function continentWeight(continent) {
   const innerSeaContinents = new Set(["Avistan", "Garund"]);
   const isInnerSeaContinent = innerSeaContinents.has(normalizedContinent);
 
+  // Region weighting is separate from normal rarity weighting because the
+  // Regions sheet does not use rarity. Instead, continent choice is weighted.
   if (regionModeSelect.value === "balanced" || regionModeSelect.value === "custom") {
     return 1;
   }
@@ -630,14 +842,8 @@ function weightedRandomContinent(continents) {
   return continents[continents.length - 1];
 }
 
-function chooseRegionFromTab() {
-  const availableRegions = getAvailableRegions();
-
-  if (availableRegions.length === 0) {
-    return null;
-  }
-
-  const regionsByContinent = availableRegions.reduce((map, region) => {
+function getRegionsByContinentMap() {
+  return getAvailableRegions().reduce((map, region) => {
     const continent = normalizeContinentName(region.continent);
 
     if (!continent) {
@@ -651,7 +857,33 @@ function chooseRegionFromTab() {
     map.get(continent).push(region);
     return map;
   }, new Map());
+}
 
+function chooseRegionFromContinent(continent, sourceText) {
+  const normalizedContinent = normalizeContinentName(continent);
+
+  if (!normalizedContinent) {
+    return null;
+  }
+
+  const regionsByContinent = getRegionsByContinentMap();
+  const matchingRegions = regionsByContinent.get(normalizedContinent) || [];
+
+  if (matchingRegions.length === 0) {
+    return null;
+  }
+
+  const chosenRegion = randomItem(matchingRegions);
+
+  return {
+    name: chosenRegion.name,
+    continent: normalizedContinent,
+    sourceText,
+  };
+}
+
+function chooseRegionFromTab() {
+  const regionsByContinent = getRegionsByContinentMap();
   let continentPool = [...regionsByContinent.keys()];
 
   if (regionModeSelect.value === "custom") {
@@ -663,6 +895,9 @@ function chooseRegionFromTab() {
     return null;
   }
 
+  // Region selection happens in two steps:
+  // 1. choose a continent using the current region preset
+  // 2. choose any region inside that continent equally
   const chosenContinent = weightedRandomContinent(continentPool);
   const chosenRegion = randomItem(regionsByContinent.get(chosenContinent) || []);
 
@@ -672,6 +907,7 @@ function chooseRegionFromTab() {
 
   return {
     name: chosenRegion.name,
+    continent: chosenContinent,
     sourceText: `Continent: ${chosenContinent}`,
   };
 }
@@ -818,7 +1054,6 @@ function updateRarityModeControl() {
   if (rarityFilter === "common-only") {
     rarityModeGroup.hidden = true;
     rarityModeSelect.disabled = true;
-    rarityModeHint.textContent = "";
     return;
   }
 
@@ -838,7 +1073,6 @@ function updateRarityModeControl() {
   rarityModeSelect.value = optionSet.some(option => option.value === currentMode)
     ? currentMode
     : optionSet[0].value;
-  updateRarityModeHint();
 }
 
 function rarityWeight(item) {
@@ -877,6 +1111,8 @@ function weightedRandomItem(array) {
     return null;
   }
 
+  // Build a "weighted lottery" so common options appear more often without
+  // completely removing uncommon or rare ones from the pool.
   const totalWeight = array.reduce(
     (sum, item) => sum + rarityWeight(item),
     0
@@ -999,11 +1235,14 @@ async function loadData() {
   retryButton.hidden = true;
 
   try {
+    // Load every sheet up front so one button click can generate everything
+    // without making more network requests in the middle of a roll.
     [
       ancestries,
       heritages,
       backgrounds,
       regions,
+      deities,
       classes,
       subclasses,
       archetypes,
@@ -1013,6 +1252,7 @@ async function loadData() {
       loadCsvData(heritageCsvUrl),
       loadCsvData(backgroundCsvUrl),
       loadCsvData(regionCsvUrl),
+      loadCsvData(deityCsvUrl),
       loadCsvData(classCsvUrl),
       loadCsvData(subclassCsvUrl),
       loadCsvData(archetypeCsvUrl),
@@ -1022,6 +1262,7 @@ async function loadData() {
     renderSourceCheckboxes();
     renderRegionCheckboxes();
     updateRegionModeControl();
+    updateWeightingGuide();
 
     setStatusMessageText("");
     generateButton.disabled = false;
@@ -1037,18 +1278,249 @@ async function loadData() {
 }
 
 function chooseRegion(chosenBackground) {
-  const backgroundRegion = String(chosenBackground.region || "").trim();
+  if (!isRegionEnabled()) {
+    return null;
+  }
 
+  const backgroundRegion = String(chosenBackground.region || "").trim();
+  const backgroundContinent = String(chosenBackground.continent || "").trim();
+
+  // A background-specific region wins over random rolling. Only blank
+  // backgrounds need a fallback region from the Regions tab.
   if (backgroundRegion) {
+    const matchingRegion = findRegionByName(backgroundRegion);
+
     return {
       name: backgroundRegion,
+      continent: matchingRegion ? normalizeContinentName(matchingRegion.continent) : "",
       sourceText: chosenBackground.source
         ? `From background (${chosenBackground.source})`
         : "From background",
     };
   }
 
+  // Some backgrounds now point to a whole continent instead of one exact
+  // region. In that case we keep the continent fixed and only randomize the
+  // final region inside it.
+  if (backgroundContinent) {
+    const chosenRegionFromContinent = chooseRegionFromContinent(
+      backgroundContinent,
+      chosenBackground.source
+        ? `From background continent (${chosenBackground.source})`
+        : "From background continent"
+    );
+
+    if (chosenRegionFromContinent) {
+      return chosenRegionFromContinent;
+    }
+  }
+
   return chooseRegionFromTab();
+}
+
+// ===============================
+// DEITY LOGIC
+// ===============================
+
+function splitDeityCategories(value) {
+  return String(value || "")
+    .split(",")
+    .map(category => category.trim())
+    .filter(category => category !== "");
+}
+
+function getRegionalDeityCategory(chosenRegion) {
+  const regionContinent = normalizeContinentName(chosenRegion?.continent);
+
+  if (regionContinent === "Garund") {
+    return "Mwangi Gods";
+  }
+
+  if (regionContinent === "Tian Xia") {
+    return "Tian Gods";
+  }
+
+  return "";
+}
+
+function getAncestralDeityCategory(chosenAncestry) {
+  const ancestryName = String(chosenAncestry?.name || "").trim().toLowerCase();
+
+  if (ancestryName === "dwarf") {
+    return "Dwarven Gods";
+  }
+
+  if (ancestryName === "elf") {
+    return "Elven Gods";
+  }
+
+  if (ancestryName === "goblin") {
+    return "Goblin Gods";
+  }
+
+  if (ancestryName === "orc") {
+    return "Orc Gods";
+  }
+
+  return "";
+}
+
+function getDeityBucketName(category, chosenRegion, chosenAncestry) {
+  const regionalCategory = getRegionalDeityCategory(chosenRegion);
+  const ancestralCategory = getAncestralDeityCategory(chosenAncestry);
+
+  if (category === "Gods of the Inner Sea") {
+    return "Gods of the Inner Sea";
+  }
+
+  if (regionalCategory && category === regionalCategory) {
+    return "Regional";
+  }
+
+  if (ancestralCategory && category === ancestralCategory) {
+    return "Ancestral";
+  }
+
+  if (category === "Pantheon") {
+    return "Pantheon";
+  }
+
+  if (category === "Faiths & Philosophies") {
+    return "Faiths & Philosophies";
+  }
+
+  if (category === "Other Gods") {
+    return "Other Gods";
+  }
+
+  return "Remaining Gods";
+}
+
+function getDeityBucketWeight(bucketName) {
+  if (bucketName === "Gods of the Inner Sea") {
+    return 10;
+  }
+
+  if (bucketName === "Regional") {
+    return 10;
+  }
+
+  if (bucketName === "Ancestral") {
+    return 8;
+  }
+
+  if (bucketName === "Pantheon") {
+    return 3;
+  }
+
+  if (bucketName === "Faiths & Philosophies") {
+    return 2;
+  }
+
+  if (bucketName === "Other Gods") {
+    return 3;
+  }
+
+  if (bucketName === "None") {
+    return 5;
+  }
+
+  return 1;
+}
+
+function getDeityBuckets(availableDeities, chosenRegion, chosenAncestry) {
+  const buckets = new Map();
+
+  availableDeities.forEach(deity => {
+    const categories = splitDeityCategories(deity.category);
+    const bucketNames = categories.length > 0
+      ? [...new Set(categories.map(category => getDeityBucketName(category, chosenRegion, chosenAncestry)))]
+      : ["Remaining Gods"];
+
+    bucketNames.forEach(bucketName => {
+      if (!buckets.has(bucketName)) {
+        buckets.set(bucketName, []);
+      }
+
+      buckets.get(bucketName).push(deity);
+    });
+  });
+
+  return buckets;
+}
+
+function chooseWeightedDeityBucket(buckets) {
+  const bucketEntries = [...buckets.entries()]
+    .filter(([, deityList]) => deityList.length > 0)
+    .map(([bucketName]) => ({
+      name: bucketName,
+      weight: getDeityBucketWeight(bucketName),
+    }));
+
+  bucketEntries.push({
+    name: "None",
+    weight: getDeityBucketWeight("None"),
+  });
+
+  const totalWeight = bucketEntries.reduce((sum, bucket) => sum + bucket.weight, 0);
+  let remainingWeight = Math.random() * totalWeight;
+
+  for (const bucket of bucketEntries) {
+    remainingWeight -= bucket.weight;
+
+    if (remainingWeight < 0) {
+      return bucket.name;
+    }
+  }
+
+  return bucketEntries[bucketEntries.length - 1].name;
+}
+
+function chooseDeity(chosenAncestry, chosenRegion) {
+  if (!isDeityEnabled()) {
+    return null;
+  }
+
+  const availableDeities = applyAccessAndSourceFilters(deities);
+
+  if (availableDeities.length === 0) {
+    return {
+      name: "None",
+      sourceText: "",
+      category: "",
+    };
+  }
+
+  // Roll the deity bucket first so large categories do not become more common
+  // just because they contain more entries. After that, pick one deity from
+  // inside the chosen bucket.
+  const deityBuckets = getDeityBuckets(availableDeities, chosenRegion, chosenAncestry);
+  const chosenBucket = chooseWeightedDeityBucket(deityBuckets);
+
+  if (chosenBucket === "None") {
+    return {
+      name: "None",
+      sourceText: "",
+      category: "",
+    };
+  }
+
+  const deityPool = deityBuckets.get(chosenBucket) || [];
+  const deityChoice = randomItem(deityPool);
+
+  if (!deityChoice) {
+    return {
+      name: "None",
+      sourceText: "",
+      category: "",
+    };
+  }
+
+  return {
+    name: deityChoice.name,
+    sourceText: deityChoice.source,
+    category: deityChoice.category,
+  };
 }
 
 // ===============================
@@ -1267,6 +1739,8 @@ function generateCharacter() {
     return;
   }
 
+  // Start by building the legal pools under the current filters. From here on,
+  // every roll should come from these filtered lists or from data tied to them.
   const availableAncestries = applyActiveFilters(ancestries);
   const availableBackgrounds = applyActiveFilters(backgrounds);
   const availableClasses = filterClassesForLockedArchetype(
@@ -1294,8 +1768,11 @@ function generateCharacter() {
   let chosenClass = lockedSelections.class;
   let chosenSubclasses = lockedSelections.subclasses;
   let chosenKeyAbility = lockedSelections.keyAbility;
+  let chosenDeity = isDeityEnabled() ? lockedSelections.deity : null;
   let chosenArchetype = isArchetypeEnabled() ? lockedSelections.archetype : null;
 
+  // A locked archetype can imply extra rules, like needing a spellcaster or a
+  // specific ancestry. This helper lines those dependencies up before rolling.
   ({
     chosenClass,
     chosenAncestry: ancestry,
@@ -1314,7 +1791,9 @@ function generateCharacter() {
       findClassByName(chosenSubclasses[0].class) || { name: chosenSubclasses[0].class };
   }
 
-  // Pick ancestry
+  // Pick the main character pieces in dependency order so later choices have
+  // the information they need: heritage needs ancestry, subclasses need class,
+  // and key ability may depend on subclass details.
   if (!ancestry) {
     ancestry = weightedRandomItem(availableAncestries);
   }
@@ -1358,7 +1837,7 @@ function generateCharacter() {
 
   const chosenRegion = chooseRegion(background);
 
-  if (!chosenRegion) {
+  if (isRegionEnabled() && !chosenRegion) {
     setStatusMessageText(
       regionModeSelect.value === "custom"
         ? "No continents are selected for custom region rolling. Choose at least one continent."
@@ -1368,6 +1847,10 @@ function generateCharacter() {
     return;
   }
 
+  if (!chosenDeity) {
+    chosenDeity = chooseDeity(ancestry, chosenRegion);
+  }
+
   currentCharacter = {
     ancestry: cloneValue(ancestry),
     heritage: cloneValue(heritage),
@@ -1375,6 +1858,7 @@ function generateCharacter() {
     region: cloneValue(chosenRegion),
     class: cloneValue(chosenClass),
     keyAbility: cloneValue(chosenKeyAbility),
+    deity: cloneValue(chosenDeity),
     archetype: cloneValue(chosenArchetype),
     subclasses: cloneValue(chosenSubclasses),
   };
@@ -1388,9 +1872,22 @@ function generateCharacter() {
     heritage ? heritage.source : ""
   );
   setValueAndSource("backgroundResult", "backgroundSource", background.name, background.source);
-  setValueAndSource("regionResult", "regionSource", chosenRegion.name, chosenRegion.sourceText);
+  setValueAndSource(
+    "regionResult",
+    "regionSource",
+    chosenRegion ? chosenRegion.name : "Off",
+    chosenRegion ? chosenRegion.sourceText : ""
+  );
   setValueAndSource("classResult", "classSource", chosenClass.name, chosenClass.source);
   document.getElementById("keyAbilityResult").textContent = chosenKeyAbility.value;
+  setValueAndSource(
+    "deityResult",
+    "deitySource",
+    isDeityEnabled()
+      ? (chosenDeity ? chosenDeity.name : "None")
+      : "Off",
+    isDeityEnabled() && chosenDeity ? chosenDeity.sourceText : ""
+  );
   setValueAndSource(
     "archetypeResult",
     "archetypeSource",
@@ -1428,6 +1925,8 @@ function generateCharacter() {
     subclassItem.textContent = "None";
     subclassResultElement.appendChild(subclassItem);
   }
+
+  updateWeightingGuide();
 }
 
 // ===============================
@@ -1436,9 +1935,23 @@ function generateCharacter() {
 
 generateButton.addEventListener("click", generateCharacter);
 retryButton.addEventListener("click", loadData);
-rarityFilterSelect.addEventListener("change", updateRarityModeControl);
-rarityModeSelect.addEventListener("change", updateRarityModeHint);
-regionModeSelect.addEventListener("change", updateRegionModeControl);
+rarityFilterSelect.addEventListener("change", () => {
+  updateRarityModeControl();
+  updateWeightingGuide();
+});
+rarityModeSelect.addEventListener("change", () => {
+  updateWeightingGuide();
+});
+regionToggleSelect.addEventListener("change", () => {
+  updateRegionModeControl();
+  updateSecondaryResultsVisibility();
+  updateWeightingGuide();
+});
+regionModeSelect.addEventListener("change", () => {
+  updateRegionModeControl();
+  updateWeightingGuide();
+});
+regionCheckboxGroups.addEventListener("change", updateWeightingGuide);
 sourcePresetSelect.addEventListener("change", applySourcePreset);
 archetypeToggleSelect.addEventListener("change", () => {
   if (!isArchetypeEnabled()) {
@@ -1446,7 +1959,17 @@ archetypeToggleSelect.addEventListener("change", () => {
     updateLockButtons();
   }
 
-  updateArchetypeVisibility();
+  updateSecondaryResultsVisibility();
+  updateWeightingGuide();
+});
+deityToggleSelect.addEventListener("change", () => {
+  if (!isDeityEnabled()) {
+    lockedSelections.deity = null;
+    updateLockButtons();
+  }
+
+  updateSecondaryResultsVisibility();
+  updateWeightingGuide();
 });
 themeToggle.addEventListener("click", () => {
   const theme = document.body.dataset.theme === "dark" ? "light" : "dark";
@@ -1471,11 +1994,13 @@ lockButtons.heritage.addEventListener("click", () => toggleLock("heritage"));
 lockButtons.background.addEventListener("click", () => toggleLock("background"));
 lockButtons.class.addEventListener("click", () => toggleLock("class"));
 lockButtons.keyAbility.addEventListener("click", () => toggleLock("keyAbility"));
+lockButtons.deity.addEventListener("click", () => toggleLock("deity"));
 lockButtons.archetype.addEventListener("click", () => toggleLock("archetype"));
 lockButtons.subclasses.addEventListener("click", () => toggleLock("subclasses"));
 updateLockButtons();
 initializeTheme();
 updateRarityModeControl();
 updateRegionModeControl();
-updateArchetypeVisibility();
+updateSecondaryResultsVisibility();
+updateWeightingGuide();
 loadData();
