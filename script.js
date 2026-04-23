@@ -16,6 +16,9 @@ const regionCsvUrl =
 const deityCsvUrl =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=1202849080&single=true&output=csv";
 
+const weaponCsvUrl =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=338604730&single=true&output=csv";
+
 const classCsvUrl =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=982187207&single=true&output=csv";
 
@@ -36,6 +39,7 @@ let heritages = [];
 let backgrounds = [];
 let regions = [];
 let deities = [];
+let weapons = [];
 let classes = [];
 let subclasses = [];
 let archetypes = [];
@@ -50,6 +54,7 @@ const lockedSelections = {
   class: null,
   keyAbility: null,
   deity: null,
+  weapon: null,
   archetype: null,
   subclasses: null,
 };
@@ -75,10 +80,12 @@ const rarityWeightingGuide = document.getElementById("rarityWeightingGuide");
 const regionWeightingGuide = document.getElementById("regionWeightingGuide");
 const deityWeightingGuide = document.getElementById("deityWeightingGuide");
 const archetypeWeightingGuide = document.getElementById("archetypeWeightingGuide");
+const weaponWeightingGuide = document.getElementById("weaponWeightingGuide");
 const statusMessage = document.getElementById("statusMessage");
 const secondaryResultsSection = document.getElementById("secondaryResultsSection");
 const regionSection = document.getElementById("regionSection");
 const deitySection = document.getElementById("deitySection");
+const weaponSection = document.getElementById("weaponSection");
 const archetypeSection = document.getElementById("archetypeSection");
 const lockButtons = {
   ancestry: document.getElementById("lockAncestryBtn"),
@@ -88,6 +95,7 @@ const lockButtons = {
   class: document.getElementById("lockClassBtn"),
   keyAbility: document.getElementById("lockKeyAbilityBtn"),
   deity: document.getElementById("lockDeityBtn"),
+  weapon: document.getElementById("lockWeaponBtn"),
   archetype: document.getElementById("lockArchetypeBtn"),
   subclasses: document.getElementById("lockSubclassesBtn"),
 };
@@ -308,16 +316,21 @@ function updateArchetypeVisibility() {
 }
 
 function updateDeityVisibility() {
-  deitySection.hidden = !isDeityEnabled();
+  deitySection.hidden = !(isDeityEnabled() || characterNeedsDeity(currentCharacter?.class, currentCharacter?.background));
+}
+
+function updateWeaponVisibility() {
+  weaponSection.hidden = false;
 }
 
 function updateSecondaryResultsVisibility() {
   regionSection.hidden = !isRegionEnabled();
   updateDeityVisibility();
+  updateWeaponVisibility();
   updateArchetypeVisibility();
 
   const hasLeftColumnContent = isRegionEnabled() || isDeityEnabled();
-  const hasRightColumnContent = isArchetypeEnabled();
+  const hasRightColumnContent = true;
 
   deitySection.classList.toggle("is-first-visible", !isRegionEnabled() && isDeityEnabled());
   secondaryResultsSection.hidden = !hasLeftColumnContent && !hasRightColumnContent;
@@ -749,7 +762,7 @@ function getCurrentRegionWeightingItems() {
 }
 
 function getCurrentDeityWeightingItems() {
-  if (!isDeityEnabled()) {
+  if (!isDeityEnabled() && !characterNeedsDeity(currentCharacter?.class, currentCharacter?.background)) {
     return ["Deity rolling is currently turned off."];
   }
 
@@ -780,11 +793,41 @@ function getCurrentArchetypeWeightingItems() {
   ];
 }
 
+function getCurrentWeaponWeightingItems() {
+  const items = [
+    "Weapons must come from the chosen class's allowed weapon categories.",
+    "Inside those categories, normal rarity weighting still applies.",
+  ];
+
+  if (currentCharacter?.class) {
+    const allowedCategories = splitCsvValues(currentCharacter.class.allowed_weapon_categories);
+    items.push(`Current class categories: ${allowedCategories.join(", ")}.`);
+
+    const favoredGroups = splitCsvValues(currentCharacter.class.favored_weapon_groups);
+    const favoredSpecificWeapons = splitCsvValues(currentCharacter.class.favored_specific_weapons);
+
+    if (favoredGroups.length > 0) {
+      items.push(`Class group preference: ${favoredGroups.join(", ")}.`);
+    }
+
+    if (favoredSpecificWeapons.length > 0) {
+      items.push(`Class specific-weapon preference: ${favoredSpecificWeapons.join(", ")}.`);
+    }
+  } else {
+    items.push("Class preferences are applied after a class has been rolled.");
+  }
+
+  items.push("If the character must have a deity and the deity's favored weapon is legal for the class, it is weighted very strongly.");
+  items.push("For required-deity characters, there is now a 90% chance to use the legal deity-favored weapon before the normal weapon roll happens.");
+  return items;
+}
+
 function updateWeightingGuide() {
   renderWeightingItems(rarityWeightingGuide, getCurrentRarityWeightingItems());
   renderWeightingItems(regionWeightingGuide, getCurrentRegionWeightingItems());
   renderWeightingItems(deityWeightingGuide, getCurrentDeityWeightingItems());
   renderWeightingItems(archetypeWeightingGuide, getCurrentArchetypeWeightingItems());
+  renderWeightingItems(weaponWeightingGuide, getCurrentWeaponWeightingItems());
 }
 
 function getSelectedCustomContinents() {
@@ -1232,6 +1275,7 @@ async function loadData() {
       backgrounds,
       regions,
       deities,
+      weapons,
       classes,
       subclasses,
       archetypes,
@@ -1242,6 +1286,7 @@ async function loadData() {
       loadCsvData(backgroundCsvUrl),
       loadCsvData(regionCsvUrl),
       loadCsvData(deityCsvUrl),
+      loadCsvData(weaponCsvUrl),
       loadCsvData(classCsvUrl),
       loadCsvData(subclassCsvUrl),
       loadCsvData(archetypeCsvUrl),
@@ -1305,6 +1350,10 @@ function chooseRegion(chosenBackground) {
   }
 
   return chooseRegionFromTab();
+}
+
+function characterNeedsDeity(chosenClass, chosenBackground) {
+  return isTrueValue(chosenClass?.needs_deity) || isTrueValue(chosenBackground?.needs_deity);
 }
 
 function isBackgroundCompatibleWithRegion(backgroundOption, chosenRegion) {
@@ -1459,7 +1508,7 @@ function getDeityBuckets(availableDeities, chosenRegion, chosenAncestry) {
   return buckets;
 }
 
-function chooseWeightedDeityBucket(buckets) {
+function chooseWeightedDeityBucket(buckets, requiresDeity = false) {
   const bucketEntries = [...buckets.entries()]
     .filter(([, deityList]) => deityList.length > 0)
     .map(([bucketName]) => ({
@@ -1467,10 +1516,12 @@ function chooseWeightedDeityBucket(buckets) {
       weight: getDeityBucketWeight(bucketName),
     }));
 
-  bucketEntries.push({
-    name: "None",
-    weight: getDeityBucketWeight("None"),
-  });
+  if (!requiresDeity) {
+    bucketEntries.push({
+      name: "None",
+      weight: getDeityBucketWeight("None"),
+    });
+  }
 
   const totalWeight = bucketEntries.reduce((sum, bucket) => sum + bucket.weight, 0);
   let remainingWeight = Math.random() * totalWeight;
@@ -1486,18 +1537,27 @@ function chooseWeightedDeityBucket(buckets) {
   return bucketEntries[bucketEntries.length - 1].name;
 }
 
-function chooseDeity(chosenAncestry, chosenRegion) {
-  if (!isDeityEnabled()) {
+function chooseDeity(chosenAncestry, chosenRegion, chosenClass, chosenBackground) {
+  const requiresDeity = characterNeedsDeity(chosenClass, chosenBackground);
+
+  if (!isDeityEnabled() && !requiresDeity) {
     return null;
   }
 
-  const availableDeities = applyAccessAndSourceFilters(deities);
+  const availableDeities = applyAccessAndSourceFilters(deities).filter(deity => {
+    if (!requiresDeity) {
+      return true;
+    }
+
+    return !splitDeityCategories(deity.category).includes("Faiths & Philosophies");
+  });
 
   if (availableDeities.length === 0) {
-    return {
+    return requiresDeity ? null : {
       name: "None",
       sourceText: "",
       category: "",
+      favoredWeapon: "",
     };
   }
 
@@ -1505,13 +1565,14 @@ function chooseDeity(chosenAncestry, chosenRegion) {
   // just because they contain more entries. After that, pick one deity from
   // inside the chosen bucket.
   const deityBuckets = getDeityBuckets(availableDeities, chosenRegion, chosenAncestry);
-  const chosenBucket = chooseWeightedDeityBucket(deityBuckets);
+  const chosenBucket = chooseWeightedDeityBucket(deityBuckets, requiresDeity);
 
   if (chosenBucket === "None") {
     return {
       name: "None",
       sourceText: "",
       category: "",
+      favoredWeapon: "",
     };
   }
 
@@ -1523,6 +1584,7 @@ function chooseDeity(chosenAncestry, chosenRegion) {
       name: "None",
       sourceText: "",
       category: "",
+      favoredWeapon: "",
     };
   }
 
@@ -1530,6 +1592,150 @@ function chooseDeity(chosenAncestry, chosenRegion) {
     name: deityChoice.name,
     sourceText: deityChoice.source,
     category: deityChoice.category,
+    favoredWeapon: deityChoice.favored_weapon,
+  };
+}
+
+// ===============================
+// WEAPON LOGIC
+// ===============================
+
+function weaponGroups(weapon) {
+  return [
+    String(weapon.group || "").trim().toLowerCase(),
+    String(weapon.secondary_group || "").trim().toLowerCase(),
+  ].filter(group => group !== "");
+}
+
+function weaponMatchesAllowedCategories(weapon, chosenClass, chosenDeity = null, requiresDeity = false) {
+  const allowedCategories = splitCsvValues(chosenClass.allowed_weapon_categories);
+  const favoredWeapons = classFavoredSpecificWeapons(chosenClass);
+  const deityWeapons = deityFavoredWeapons(chosenDeity);
+  const weaponCategory = String(weapon.category || "").trim().toLowerCase();
+  const weaponName = String(weapon.name || "").trim().toLowerCase();
+
+  if (favoredWeapons.includes(weaponName)) {
+    return true;
+  }
+
+  if (requiresDeity && deityWeapons.includes(weaponName)) {
+    return true;
+  }
+
+  return allowedCategories.includes(weaponCategory);
+}
+
+function classFavoredWeaponGroups(chosenClass) {
+  return splitCsvValues(chosenClass.favored_weapon_groups);
+}
+
+function classFavoredSpecificWeapons(chosenClass) {
+  return splitCsvValues(chosenClass.favored_specific_weapons);
+}
+
+function deityFavoredWeapons(chosenDeity) {
+  return splitCsvValues(chosenDeity?.favoredWeapon);
+}
+
+function classRequiresFavoredWeaponGroup(chosenClass) {
+  return String(chosenClass?.name || "").trim().toLowerCase() === "gunslinger";
+}
+
+function findLegalDeityFavoredWeapon(weaponPool, chosenDeity) {
+  const favoredWeapons = deityFavoredWeapons(chosenDeity);
+
+  if (favoredWeapons.length === 0) {
+    return null;
+  }
+
+  return weaponPool.find(weapon =>
+    favoredWeapons.includes(String(weapon.name || "").trim().toLowerCase())
+  ) || null;
+}
+
+function weaponPreferenceMultiplier(weapon, chosenClass, chosenDeity, requiresDeity) {
+  let multiplier = 1;
+  const weaponName = String(weapon.name || "").trim().toLowerCase();
+  const favoredGroups = classFavoredWeaponGroups(chosenClass);
+  const favoredWeapons = classFavoredSpecificWeapons(chosenClass);
+
+  if (favoredGroups.some(group => weaponGroups(weapon).includes(group))) {
+    multiplier *= 3;
+  }
+
+  if (favoredWeapons.includes(weaponName)) {
+    multiplier *= 5;
+  }
+
+  return multiplier;
+}
+
+function weightedRandomWeapon(weaponPool, chosenClass, chosenDeity, requiresDeity) {
+  if (weaponPool.length === 0) {
+    return null;
+  }
+
+  const totalWeight = weaponPool.reduce(
+    (sum, weapon) => sum + (rarityWeight(weapon) * weaponPreferenceMultiplier(weapon, chosenClass, chosenDeity, requiresDeity)),
+    0
+  );
+  let remainingWeight = Math.random() * totalWeight;
+
+  for (const weapon of weaponPool) {
+    remainingWeight -= rarityWeight(weapon) * weaponPreferenceMultiplier(weapon, chosenClass, chosenDeity, requiresDeity);
+
+    if (remainingWeight < 0) {
+      return weapon;
+    }
+  }
+
+  return weaponPool[weaponPool.length - 1];
+}
+
+function chooseWeapon(chosenClass, chosenDeity, chosenBackground) {
+  const requiresDeity = characterNeedsDeity(chosenClass, chosenBackground);
+  let availableWeapons = applyActiveFilters(weapons).filter(weapon =>
+    weaponMatchesAllowedCategories(weapon, chosenClass, chosenDeity, requiresDeity)
+  );
+
+  if (availableWeapons.length === 0) {
+    return null;
+  }
+
+  if (classRequiresFavoredWeaponGroup(chosenClass)) {
+    const favoredGroups = classFavoredWeaponGroups(chosenClass);
+    const favoredGroupWeapons = availableWeapons.filter(weapon =>
+      favoredGroups.some(group => weaponGroups(weapon).includes(group))
+    );
+
+    if (favoredGroupWeapons.length > 0) {
+      availableWeapons = favoredGroupWeapons;
+    }
+  }
+
+  // Required-deity characters should almost always carry their deity's favored
+  // weapon when it is legal for their class. We only fall back to the normal
+  // weighted weapon roll about 1 time in 10.
+  if (requiresDeity) {
+    const legalFavoredWeapon = findLegalDeityFavoredWeapon(availableWeapons, chosenDeity);
+
+    if (legalFavoredWeapon && Math.random() < 0.9) {
+      return {
+        name: legalFavoredWeapon.name,
+        sourceText: legalFavoredWeapon.source,
+      };
+    }
+  }
+
+  const chosenWeapon = weightedRandomWeapon(availableWeapons, chosenClass, chosenDeity, requiresDeity);
+
+  if (!chosenWeapon) {
+    return null;
+  }
+
+  return {
+    name: chosenWeapon.name,
+    sourceText: chosenWeapon.source,
   };
 }
 
@@ -1780,6 +1986,7 @@ function generateCharacter() {
   let chosenSubclasses = lockedSelections.subclasses;
   let chosenKeyAbility = lockedSelections.keyAbility;
   let chosenDeity = isDeityEnabled() ? lockedSelections.deity : null;
+  let chosenWeapon = lockedSelections.weapon;
   let chosenArchetype = isArchetypeEnabled() ? lockedSelections.archetype : null;
 
   // A locked archetype can imply extra rules, like needing a spellcaster or a
@@ -1883,7 +2090,27 @@ function generateCharacter() {
   }
 
   if (!chosenDeity) {
-    chosenDeity = chooseDeity(ancestry, chosenRegion);
+    chosenDeity = chooseDeity(ancestry, chosenRegion, chosenClass, background);
+  }
+
+  if (characterNeedsDeity(chosenClass, background) && !chosenDeity) {
+    setStatusMessageText(
+      "The current filters do not allow a valid deity for this class or background.",
+      true
+    );
+    return;
+  }
+
+  if (!chosenWeapon) {
+    chosenWeapon = chooseWeapon(chosenClass, chosenDeity, background);
+  }
+
+  if (!chosenWeapon) {
+    setStatusMessageText(
+      "No weapons match the current class, filters, and source settings.",
+      true
+    );
+    return;
   }
 
   currentCharacter = {
@@ -1894,9 +2121,12 @@ function generateCharacter() {
     class: cloneValue(chosenClass),
     keyAbility: cloneValue(chosenKeyAbility),
     deity: cloneValue(chosenDeity),
+    weapon: cloneValue(chosenWeapon),
     archetype: cloneValue(chosenArchetype),
     subclasses: cloneValue(chosenSubclasses),
   };
+
+  updateSecondaryResultsVisibility();
 
   // Display simple results
   setValueAndSource("ancestryResult", "ancestrySource", ancestry.name, ancestry.source);
@@ -1918,11 +2148,12 @@ function generateCharacter() {
   setValueAndSource(
     "deityResult",
     "deitySource",
-    isDeityEnabled()
-      ? (chosenDeity ? chosenDeity.name : "None")
-      : "Off",
-    isDeityEnabled() && chosenDeity ? chosenDeity.sourceText : ""
+    chosenDeity
+      ? chosenDeity.name
+      : (isDeityEnabled() ? "None" : "Off"),
+    chosenDeity ? chosenDeity.sourceText : ""
   );
+  setValueAndSource("weaponResult", "weaponSource", chosenWeapon.name, chosenWeapon.sourceText);
   setValueAndSource(
     "archetypeResult",
     "archetypeSource",
@@ -2036,6 +2267,7 @@ lockButtons.region.addEventListener("click", () => toggleLock("region"));
 lockButtons.class.addEventListener("click", () => toggleLock("class"));
 lockButtons.keyAbility.addEventListener("click", () => toggleLock("keyAbility"));
 lockButtons.deity.addEventListener("click", () => toggleLock("deity"));
+lockButtons.weapon.addEventListener("click", () => toggleLock("weapon"));
 lockButtons.archetype.addEventListener("click", () => toggleLock("archetype"));
 lockButtons.subclasses.addEventListener("click", () => toggleLock("subclasses"));
 updateLockButtons();

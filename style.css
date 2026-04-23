@@ -21,6 +21,7 @@
   --accent-class: rgba(67, 97, 238, 0.1);
   --accent-archetype: rgba(181, 93, 76, 0.1);
   --accent-deity: rgba(121, 95, 186, 0.1);
+  --accent-weapon: rgba(55, 138, 94, 0.1);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -47,6 +48,7 @@
     --accent-class: rgba(129, 140, 248, 0.14);
     --accent-archetype: rgba(251, 146, 60, 0.14);
     --accent-deity: rgba(196, 181, 253, 0.14);
+    --accent-weapon: rgba(74, 222, 128, 0.14);
   }
 }
 
@@ -73,6 +75,7 @@ body[data-theme="dark"] {
   --accent-class: rgba(129, 140, 248, 0.14);
   --accent-archetype: rgba(251, 146, 60, 0.14);
   --accent-deity: rgba(196, 181, 253, 0.14);
+  --accent-weapon: rgba(74, 222, 128, 0.14);
 }
 
 body {
@@ -340,21 +343,27 @@ button:disabled {
   background: var(--accent-deity);
 }
 
+.result-row-secondary-weapon {
+  margin-bottom: 16px;
+  background: var(--accent-weapon);
+}
+
 .result-row-secondary-archetype {
-  margin-bottom: 0;
+  margin-bottom: 16px;
 }
 
 .deity-section[hidden],
+.weapon-section[hidden],
 .archetype-section[hidden] {
   display: none;
 }
 
 .deity-section {
-  margin-top: 16px;
+  margin-top: 0;
 }
 
-.deity-section.is-first-visible {
-  margin-top: 0;
+.weapon-section {
+  margin-bottom: 0;
 }
 
 .secondary-results-section[hidden],

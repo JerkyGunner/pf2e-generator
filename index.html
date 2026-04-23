@@ -57,7 +57,7 @@
         </div>
 
         <div class="control-group">
-          <label for="archetypeToggle" class="label">Archetypes</label>
+          <label for="archetypeToggle" class="label">Archetype</label>
           <select id="archetypeToggle" class="control-input">
             <option value="on" selected>Roll Archetype</option>
             <option value="off">Turn Archetypes Off</option>
@@ -65,7 +65,7 @@
         </div>
 
         <div class="control-group">
-          <label for="deityToggle" class="label">Deities</label>
+          <label for="deityToggle" class="label">Deity</label>
           <select id="deityToggle" class="control-input">
             <option value="on" selected>Roll Deity</option>
             <option value="off">Turn Deities Off</option>
@@ -89,10 +89,10 @@
         <div id="regionCheckboxGroups" class="region-groups"></div>
       </div>
 
-      <details class="weighting-panel">
-        <summary class="weighting-summary">Weighting Guide</summary>
+    <details class="weighting-panel">
+      <summary class="weighting-summary">Weighting Guide</summary>
 
-        <div class="weighting-content">
+      <div class="weighting-content">
           <details class="weighting-group">
             <summary class="weighting-group-summary">Rarity</summary>
             <div id="rarityWeightingGuide" class="weighting-list weighting-group-content"></div>
@@ -111,6 +111,11 @@
           <details class="weighting-group">
             <summary class="weighting-group-summary">Archetype</summary>
             <div id="archetypeWeightingGuide" class="weighting-list weighting-group-content"></div>
+          </details>
+
+          <details class="weighting-group">
+            <summary class="weighting-group-summary">Weapon</summary>
+            <div id="weaponWeightingGuide" class="weighting-list weighting-group-content"></div>
           </details>
         </div>
       </details>
@@ -252,6 +257,19 @@
                 <div class="value-row">
                   <span id="archetypeResult" class="value">-</span>
                   <span id="archetypeSource" class="source-slot"></span>
+                </div>
+              </div>
+            </div>
+
+            <div id="weaponSection" class="weapon-section">
+              <div class="result-row result-row-secondary result-row-secondary-weapon">
+                <div class="result-header">
+                  <span class="label">Favored Weapon</span>
+                  <button id="lockWeaponBtn" class="lock-button" type="button">Lock</button>
+                </div>
+                <div class="value-row">
+                  <span id="weaponResult" class="value">-</span>
+                  <span id="weaponSource" class="source-slot"></span>
                 </div>
               </div>
             </div>
