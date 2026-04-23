@@ -75,6 +75,8 @@ const sourceCheckboxGroups = document.getElementById("sourceCheckboxGroups");
 const customRegionGroup = document.getElementById("customRegionGroup");
 const regionCheckboxGroups = document.getElementById("regionCheckboxGroups");
 const themeToggle = document.getElementById("themeToggle");
+const rememberSettingsCheckbox = document.getElementById("rememberSettings");
+const resetDefaultsButton = document.getElementById("resetDefaultsBtn");
 const regionModeHint = document.getElementById("regionModeHint");
 const rarityWeightingGuide = document.getElementById("rarityWeightingGuide");
 const regionWeightingGuide = document.getElementById("regionWeightingGuide");
@@ -128,6 +130,20 @@ const sourcePresetCategories = {
 };
 
 const themeStorageKey = "pf2e-generator-theme";
+const settingsStorageKey = "pf2e-generator-settings";
+const rememberSettingsStorageKey = "pf2e-generator-remember-settings";
+let pendingSettingsToApply = null;
+
+const defaultGeneratorSettings = {
+  rarityFilter: "all",
+  rarityMode: "strong",
+  accessFilter: "standard-only",
+  regionToggle: "on",
+  archetypeToggle: "on",
+  deityToggle: "on",
+  regionMode: "inner-sea",
+  sourcePreset: "core-rulebooks-lost-omens",
+};
 
 // ===============================
 // HELPER FUNCTIONS
@@ -188,6 +204,145 @@ function initializeTheme() {
   // fall back to whatever their device theme is using.
   const savedTheme = localStorage.getItem(themeStorageKey);
   applyTheme(savedTheme || getSystemTheme());
+}
+
+function getDefaultGeneratorSettings() {
+  return {
+    ...defaultGeneratorSettings,
+    selectedSources: null,
+    selectedContinents: null,
+  };
+}
+
+function isRememberSettingsEnabled() {
+  return rememberSettingsCheckbox.checked;
+}
+
+function setRememberSettingsEnabled(enabled, persist = true) {
+  rememberSettingsCheckbox.checked = enabled;
+
+  if (persist) {
+    localStorage.setItem(rememberSettingsStorageKey, String(enabled));
+  }
+
+  if (!enabled) {
+    localStorage.removeItem(settingsStorageKey);
+  }
+}
+
+function initializeRememberSettingsPreference() {
+  const savedPreference = localStorage.getItem(rememberSettingsStorageKey);
+  setRememberSettingsEnabled(savedPreference !== "false", false);
+}
+
+function getSavedGeneratorSettings() {
+  const savedSettings = localStorage.getItem(settingsStorageKey);
+
+  if (!savedSettings) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(savedSettings);
+  } catch (error) {
+    console.error("Could not read saved generator settings.", error);
+    return null;
+  }
+}
+
+function collectCurrentSettings() {
+  const sourceInputs = sourceCheckboxGroups.querySelectorAll("input[type=\"checkbox\"]");
+  const regionInputs = regionCheckboxGroups.querySelectorAll("input[type=\"checkbox\"]");
+
+  return {
+    rarityFilter: rarityFilterSelect.value,
+    rarityMode: rarityModeSelect.value,
+    accessFilter: accessFilterSelect.value,
+    regionToggle: regionToggleSelect.value,
+    archetypeToggle: archetypeToggleSelect.value,
+    deityToggle: deityToggleSelect.value,
+    regionMode: regionModeSelect.value,
+    sourcePreset: sourcePresetSelect.value,
+    selectedSources: sourceInputs.length > 0
+      ? [...sourceInputs].filter(input => input.checked).map(input => input.value)
+      : null,
+    selectedContinents: regionInputs.length > 0
+      ? [...regionInputs].filter(input => input.checked).map(input => input.value)
+      : null,
+  };
+}
+
+function applySelectedCheckboxValues(container, selectedValues) {
+  const selectedValueSet = new Set(selectedValues || []);
+
+  container.querySelectorAll("input[type=\"checkbox\"]").forEach(input => {
+    input.checked = selectedValueSet.has(input.value);
+  });
+}
+
+function applyGeneratorSettings(settings = {}) {
+  const resolvedSettings = {
+    ...getDefaultGeneratorSettings(),
+    ...settings,
+  };
+
+  rarityFilterSelect.value = resolvedSettings.rarityFilter;
+  updateRarityModeControl();
+  rarityModeSelect.value = resolvedSettings.rarityMode;
+  accessFilterSelect.value = resolvedSettings.accessFilter;
+  regionToggleSelect.value = resolvedSettings.regionToggle;
+  archetypeToggleSelect.value = resolvedSettings.archetypeToggle;
+  deityToggleSelect.value = resolvedSettings.deityToggle;
+  regionModeSelect.value = resolvedSettings.regionMode;
+  sourcePresetSelect.value = resolvedSettings.sourcePreset;
+
+  updateRegionModeControl();
+  updateSecondaryResultsVisibility();
+  updateWeightingGuide();
+
+  if (sourceCheckboxGroups.children.length > 0) {
+    if (Array.isArray(resolvedSettings.selectedSources)) {
+      applySelectedCheckboxValues(sourceCheckboxGroups, resolvedSettings.selectedSources);
+    } else {
+      applySourcePreset();
+    }
+  }
+
+  if (regionCheckboxGroups.children.length > 0) {
+    if (Array.isArray(resolvedSettings.selectedContinents)) {
+      applySelectedCheckboxValues(regionCheckboxGroups, resolvedSettings.selectedContinents);
+    } else {
+      regionCheckboxGroups.querySelectorAll("input[type=\"checkbox\"]").forEach(input => {
+        input.checked = true;
+      });
+    }
+  }
+
+  updateWeightingGuide();
+}
+
+function saveGeneratorSettings() {
+  if (!isRememberSettingsEnabled()) {
+    return;
+  }
+
+  localStorage.setItem(settingsStorageKey, JSON.stringify(collectCurrentSettings()));
+}
+
+function resetLockedSelections() {
+  Object.keys(lockedSelections).forEach(key => {
+    lockedSelections[key] = null;
+  });
+  updateLockButtons();
+}
+
+function resetGeneratorDefaults() {
+  const defaultSettings = getDefaultGeneratorSettings();
+  setRememberSettingsEnabled(true);
+  resetLockedSelections();
+  applyGeneratorSettings(defaultSettings);
+  saveGeneratorSettings();
+  setStatusMessageText("");
 }
 
 function setStatusMessageText(message, isError = false) {
@@ -1262,6 +1417,10 @@ async function loadCsvData(url) {
 // ===============================
 
 async function loadData() {
+  if (sourceCheckboxGroups.children.length > 0 || regionCheckboxGroups.children.length > 0) {
+    pendingSettingsToApply = collectCurrentSettings();
+  }
+
   setStatusMessageText("Loading character data...");
   generateButton.disabled = true;
   retryButton.hidden = true;
@@ -1295,8 +1454,9 @@ async function loadData() {
 
     renderSourceCheckboxes();
     renderRegionCheckboxes();
-    updateRegionModeControl();
-    updateWeightingGuide();
+    applyGeneratorSettings(pendingSettingsToApply || getSavedGeneratorSettings() || getDefaultGeneratorSettings());
+    pendingSettingsToApply = null;
+    saveGeneratorSettings();
 
     setStatusMessageText("");
     generateButton.disabled = false;
@@ -2204,10 +2364,13 @@ retryButton.addEventListener("click", loadData);
 rarityFilterSelect.addEventListener("change", () => {
   updateRarityModeControl();
   updateWeightingGuide();
+  saveGeneratorSettings();
 });
 rarityModeSelect.addEventListener("change", () => {
   updateWeightingGuide();
+  saveGeneratorSettings();
 });
+accessFilterSelect.addEventListener("change", saveGeneratorSettings);
 regionToggleSelect.addEventListener("change", () => {
   if (!isRegionEnabled()) {
     lockedSelections.region = null;
@@ -2217,13 +2380,22 @@ regionToggleSelect.addEventListener("change", () => {
   updateRegionModeControl();
   updateSecondaryResultsVisibility();
   updateWeightingGuide();
+  saveGeneratorSettings();
 });
 regionModeSelect.addEventListener("change", () => {
   updateRegionModeControl();
   updateWeightingGuide();
+  saveGeneratorSettings();
 });
-regionCheckboxGroups.addEventListener("change", updateWeightingGuide);
-sourcePresetSelect.addEventListener("change", applySourcePreset);
+regionCheckboxGroups.addEventListener("change", () => {
+  updateWeightingGuide();
+  saveGeneratorSettings();
+});
+sourcePresetSelect.addEventListener("change", () => {
+  applySourcePreset();
+  saveGeneratorSettings();
+});
+sourceCheckboxGroups.addEventListener("change", saveGeneratorSettings);
 archetypeToggleSelect.addEventListener("change", () => {
   if (!isArchetypeEnabled()) {
     lockedSelections.archetype = null;
@@ -2232,6 +2404,7 @@ archetypeToggleSelect.addEventListener("change", () => {
 
   updateSecondaryResultsVisibility();
   updateWeightingGuide();
+  saveGeneratorSettings();
 });
 deityToggleSelect.addEventListener("change", () => {
   if (!isDeityEnabled()) {
@@ -2241,7 +2414,17 @@ deityToggleSelect.addEventListener("change", () => {
 
   updateSecondaryResultsVisibility();
   updateWeightingGuide();
+  saveGeneratorSettings();
 });
+rememberSettingsCheckbox.addEventListener("change", () => {
+  const shouldRememberSettings = rememberSettingsCheckbox.checked;
+  setRememberSettingsEnabled(shouldRememberSettings);
+
+  if (shouldRememberSettings) {
+    saveGeneratorSettings();
+  }
+});
+resetDefaultsButton.addEventListener("click", resetGeneratorDefaults);
 themeToggle.addEventListener("click", () => {
   const theme = document.body.dataset.theme === "dark" ? "light" : "dark";
   localStorage.setItem(themeStorageKey, theme);
@@ -2271,9 +2454,10 @@ lockButtons.weapon.addEventListener("click", () => toggleLock("weapon"));
 lockButtons.archetype.addEventListener("click", () => toggleLock("archetype"));
 lockButtons.subclasses.addEventListener("click", () => toggleLock("subclasses"));
 updateLockButtons();
+initializeRememberSettingsPreference();
+pendingSettingsToApply = isRememberSettingsEnabled()
+  ? (getSavedGeneratorSettings() || getDefaultGeneratorSettings())
+  : getDefaultGeneratorSettings();
+applyGeneratorSettings(pendingSettingsToApply);
 initializeTheme();
-updateRarityModeControl();
-updateRegionModeControl();
-updateSecondaryResultsVisibility();
-updateWeightingGuide();
 loadData();
