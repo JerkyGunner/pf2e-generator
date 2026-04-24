@@ -53,6 +53,7 @@ const accessFilterSelect = document.getElementById("accessFilter");
 const regionToggleSelect = document.getElementById("regionToggle");
 const archetypeToggleSelect = document.getElementById("archetypeToggle");
 const deityToggleSelect = document.getElementById("deityToggle");
+const classChoiceSelect = document.getElementById("classChoice");
 const regionModeGroup = document.getElementById("regionModeGroup");
 const regionModeSelect = document.getElementById("regionMode");
 const sourcePresetSelect = document.getElementById("sourcePreset");
@@ -126,6 +127,7 @@ const defaultGeneratorSettings = {
   regionToggle: "on",
   archetypeToggle: "on",
   deityToggle: "on",
+  classChoice: "",
   regionMode: "inner-sea",
   sourcePreset: "core-rulebooks-lost-omens",
 };
@@ -246,6 +248,7 @@ function collectCurrentSettings() {
     regionToggle: regionToggleSelect.value,
     archetypeToggle: archetypeToggleSelect.value,
     deityToggle: deityToggleSelect.value,
+    classChoice: classChoiceSelect.value,
     regionMode: regionModeSelect.value,
     sourcePreset: sourcePresetSelect.value,
     selectedSources: sourceInputs.length > 0
@@ -278,6 +281,7 @@ function applyGeneratorSettings(settings = {}) {
   regionToggleSelect.value = resolvedSettings.regionToggle;
   archetypeToggleSelect.value = resolvedSettings.archetypeToggle;
   deityToggleSelect.value = resolvedSettings.deityToggle;
+  renderClassChoiceOptions(resolvedSettings.classChoice);
   regionModeSelect.value = resolvedSettings.regionMode;
   sourcePresetSelect.value = resolvedSettings.sourcePreset;
 
@@ -456,7 +460,11 @@ function updateArchetypeVisibility() {
 }
 
 function updateDeityVisibility() {
-  deitySection.hidden = !(isDeityEnabled() || characterNeedsDeity(currentCharacter?.class, currentCharacter?.background));
+  deitySection.hidden = !(isDeityEnabled() || characterNeedsDeity(
+    currentCharacter?.class,
+    currentCharacter?.background,
+    currentCharacter?.subclasses
+  ));
 }
 
 function updateWeaponVisibility() {
@@ -902,7 +910,11 @@ function getCurrentRegionWeightingItems() {
 }
 
 function getCurrentDeityWeightingItems() {
-  if (!isDeityEnabled() && !characterNeedsDeity(currentCharacter?.class, currentCharacter?.background)) {
+  if (!isDeityEnabled() && !characterNeedsDeity(
+    currentCharacter?.class,
+    currentCharacter?.background,
+    currentCharacter?.subclasses
+  )) {
     return ["Deity rolling is currently turned off."];
   }
 
@@ -943,8 +955,18 @@ function getCurrentWeaponWeightingItems() {
     const allowedCategories = splitCsvValues(currentCharacter.class.allowed_weapon_categories);
     items.push(`Current class categories: ${allowedCategories.join(", ")}.`);
 
+    const subclassTraits = subclassWeaponTraits(currentCharacter.subclasses || []);
+    const favoredTraits = splitCsvValues(currentCharacter.class.favored_weapon_traits);
     const favoredGroups = splitCsvValues(currentCharacter.class.favored_weapon_groups);
     const favoredSpecificWeapons = splitCsvValues(currentCharacter.class.favored_specific_weapons);
+
+    if (subclassTraits.includes("any")) {
+      items.push("Current subclass overrides trait filtering and allows any weapon the class normally allows.");
+    } else if (subclassTraits.length > 0) {
+      items.push(`Current subclass weapon trait requirement: ${subclassTraits.join(", ")}.`);
+    } else if (favoredTraits.length > 0) {
+      items.push(`Class weapon traits required: ${favoredTraits.join(", ")}.`);
+    }
 
     if (favoredGroups.length > 0) {
       items.push(`Class group preference: ${favoredGroups.join(", ")}.`);
@@ -1187,6 +1209,33 @@ function findClassByName(name) {
   return classes.find(
     characterClass => characterClass.name.toLowerCase() === String(name).toLowerCase()
   ) || null;
+}
+
+function renderClassChoiceOptions(preferredValue = classChoiceSelect.value) {
+  const normalizedPreferredValue = String(preferredValue || "").trim().toLowerCase();
+  const availableClasses = applyActiveFilters(classes)
+    .slice()
+    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+
+  classChoiceSelect.replaceChildren();
+
+  const randomOption = document.createElement("option");
+  randomOption.value = "";
+  randomOption.textContent = "Random Class";
+  classChoiceSelect.appendChild(randomOption);
+
+  availableClasses.forEach(characterClass => {
+    const optionElement = document.createElement("option");
+    optionElement.value = characterClass.name;
+    optionElement.textContent = characterClass.name;
+    classChoiceSelect.appendChild(optionElement);
+  });
+
+  const hasPreferredValue = [...classChoiceSelect.options].some(
+    option => String(option.value).trim().toLowerCase() === normalizedPreferredValue
+  );
+
+  classChoiceSelect.value = hasPreferredValue ? preferredValue : "";
 }
 
 function updateLockButtons() {
@@ -1453,8 +1502,10 @@ function chooseRegion(chosenBackground) {
   return chooseRegionFromTab();
 }
 
-function characterNeedsDeity(chosenClass, chosenBackground) {
-  return isTrueValue(chosenClass?.needs_deity) || isTrueValue(chosenBackground?.needs_deity);
+function characterNeedsDeity(chosenClass, chosenBackground, chosenSubclasses = []) {
+  return isTrueValue(chosenClass?.needs_deity)
+    || isTrueValue(chosenBackground?.needs_deity)
+    || chosenSubclasses.some(subclass => isTrueValue(subclass?.needs_deity));
 }
 
 function isBackgroundCompatibleWithRegion(backgroundOption, chosenRegion) {
@@ -1638,8 +1689,8 @@ function chooseWeightedDeityBucket(buckets, requiresDeity = false) {
   return bucketEntries[bucketEntries.length - 1].name;
 }
 
-function chooseDeity(chosenAncestry, chosenRegion, chosenClass, chosenBackground) {
-  const requiresDeity = characterNeedsDeity(chosenClass, chosenBackground);
+function chooseDeity(chosenAncestry, chosenRegion, chosenClass, chosenBackground, chosenSubclasses) {
+  const requiresDeity = characterNeedsDeity(chosenClass, chosenBackground, chosenSubclasses);
 
   if (!isDeityEnabled() && !requiresDeity) {
     return null;
@@ -1708,6 +1759,24 @@ function weaponGroups(weapon) {
   ].filter(group => group !== "");
 }
 
+function weaponType(weapon) {
+  return String(weapon.type || "").trim().toLowerCase();
+}
+
+function weaponIsFinesse(weapon) {
+  return isTrueValue(weapon.finesse);
+}
+
+function weaponHasTrait(weapon, traitName) {
+  const normalizedTraitName = String(traitName || "").trim().toLowerCase();
+
+  if (!normalizedTraitName) {
+    return true;
+  }
+
+  return isTrueValue(weapon[normalizedTraitName]);
+}
+
 function weaponMatchesAllowedCategories(weapon, chosenClass, chosenDeity = null, requiresDeity = false) {
   const allowedCategories = splitCsvValues(chosenClass.allowed_weapon_categories);
   const favoredWeapons = classFavoredSpecificWeapons(chosenClass);
@@ -1734,8 +1803,60 @@ function classFavoredSpecificWeapons(chosenClass) {
   return splitCsvValues(chosenClass.favored_specific_weapons);
 }
 
+function classFavoredWeaponTraits(chosenClass) {
+  return splitCsvValues(chosenClass.favored_weapon_traits);
+}
+
+function subclassWeaponTraits(chosenSubclasses) {
+  return chosenSubclasses.flatMap(subclass => splitCsvValues(subclass.weapon_trait));
+}
+
 function deityFavoredWeapons(chosenDeity) {
   return splitCsvValues(chosenDeity?.favoredWeapon);
+}
+
+function weaponIsDeityFavored(weapon, chosenDeity) {
+  const weaponName = String(weapon.name || "").trim().toLowerCase();
+  return deityFavoredWeapons(chosenDeity).includes(weaponName);
+}
+
+function weaponMatchesKeyAbility(weapon, chosenKeyAbility) {
+  const keyAbility = String(chosenKeyAbility?.value || chosenKeyAbility || "").trim().toLowerCase();
+  const type = weaponType(weapon);
+
+  if (keyAbility === "strength") {
+    return type !== "ranged";
+  }
+
+  if (keyAbility === "dexterity") {
+    return type === "ranged" || type === "both" || weaponIsFinesse(weapon);
+  }
+
+  return true;
+}
+
+function weaponMatchesClassTraits(weapon, chosenClass, chosenSubclasses = [], chosenDeity = null, requiresDeity = false) {
+  if (requiresDeity && weaponIsDeityFavored(weapon, chosenDeity)) {
+    return true;
+  }
+
+  const subclassTraits = subclassWeaponTraits(chosenSubclasses);
+
+  if (subclassTraits.includes("any")) {
+    return true;
+  }
+
+  if (subclassTraits.length > 0) {
+    return subclassTraits.some(trait => weaponHasTrait(weapon, trait));
+  }
+
+  const favoredTraits = classFavoredWeaponTraits(chosenClass);
+
+  if (favoredTraits.length === 0) {
+    return true;
+  }
+
+  return favoredTraits.some(trait => weaponHasTrait(weapon, trait));
 }
 
 function classRequiresFavoredWeaponGroup(chosenClass) {
@@ -1743,14 +1864,12 @@ function classRequiresFavoredWeaponGroup(chosenClass) {
 }
 
 function findLegalDeityFavoredWeapon(weaponPool, chosenDeity) {
-  const favoredWeapons = deityFavoredWeapons(chosenDeity);
-
-  if (favoredWeapons.length === 0) {
+  if (!chosenDeity) {
     return null;
   }
 
   return weaponPool.find(weapon =>
-    favoredWeapons.includes(String(weapon.name || "").trim().toLowerCase())
+    weaponIsDeityFavored(weapon, chosenDeity)
   ) || null;
 }
 
@@ -1793,10 +1912,19 @@ function weightedRandomWeapon(weaponPool, chosenClass, chosenDeity, requiresDeit
   return weaponPool[weaponPool.length - 1];
 }
 
-function chooseWeapon(chosenClass, chosenDeity, chosenBackground) {
-  const requiresDeity = characterNeedsDeity(chosenClass, chosenBackground);
+function chooseWeapon(chosenClass, chosenDeity, chosenBackground, chosenKeyAbility, chosenSubclasses) {
+  const requiresDeity = characterNeedsDeity(chosenClass, chosenBackground, chosenSubclasses);
   let availableWeapons = applyActiveFilters(weapons).filter(weapon =>
     weaponMatchesAllowedCategories(weapon, chosenClass, chosenDeity, requiresDeity)
+  );
+
+  availableWeapons = availableWeapons.filter(weapon =>
+    weaponMatchesClassTraits(weapon, chosenClass, chosenSubclasses, chosenDeity, requiresDeity)
+  );
+
+  availableWeapons = availableWeapons.filter(weapon =>
+    (requiresDeity && weaponIsDeityFavored(weapon, chosenDeity))
+      || weaponMatchesKeyAbility(weapon, chosenKeyAbility)
   );
 
   if (availableWeapons.length === 0) {
@@ -2089,6 +2217,7 @@ function generateCharacter() {
   let chosenDeity = isDeityEnabled() ? lockedSelections.deity : null;
   let chosenWeapon = lockedSelections.weapon;
   let chosenArchetype = isArchetypeEnabled() ? lockedSelections.archetype : null;
+  const chosenClassName = String(classChoiceSelect.value || "").trim();
 
   // A locked archetype can imply extra rules, like needing a spellcaster or a
   // specific ancestry. This helper lines those dependencies up before rolling.
@@ -2108,6 +2237,33 @@ function generateCharacter() {
   if (!chosenClass && chosenSubclasses && chosenSubclasses.length > 0) {
     chosenClass =
       findClassByName(chosenSubclasses[0].class) || { name: chosenSubclasses[0].class };
+  }
+
+  if (chosenClassName) {
+    const manuallyChosenClass = availableClasses.find(
+      characterClass => String(characterClass.name).trim().toLowerCase() === chosenClassName.toLowerCase()
+    );
+
+    if (!manuallyChosenClass) {
+      setStatusMessageText(
+        "The manually chosen class is not available under the current filters. Adjust the filters or choose Random Class.",
+        true
+      );
+      return;
+    }
+
+    if (
+      chosenClass
+      && String(chosenClass.name).trim().toLowerCase() !== chosenClassName.toLowerCase()
+    ) {
+      setStatusMessageText(
+        "The manually chosen class conflicts with another locked or required choice. Unlock the conflicting result or choose Random Class.",
+        true
+      );
+      return;
+    }
+
+    chosenClass = manuallyChosenClass;
   }
 
   if (background && chosenRegion && !isBackgroundCompatibleWithRegion(background, chosenRegion)) {
@@ -2191,10 +2347,10 @@ function generateCharacter() {
   }
 
   if (!chosenDeity) {
-    chosenDeity = chooseDeity(ancestry, chosenRegion, chosenClass, background);
+    chosenDeity = chooseDeity(ancestry, chosenRegion, chosenClass, background, chosenSubclasses);
   }
 
-  if (characterNeedsDeity(chosenClass, background) && !chosenDeity) {
+  if (characterNeedsDeity(chosenClass, background, chosenSubclasses) && !chosenDeity) {
     setStatusMessageText(
       "The current filters do not allow a valid deity for this class or background.",
       true
@@ -2203,7 +2359,7 @@ function generateCharacter() {
   }
 
   if (!chosenWeapon) {
-    chosenWeapon = chooseWeapon(chosenClass, chosenDeity, background);
+    chosenWeapon = chooseWeapon(chosenClass, chosenDeity, background, chosenKeyAbility, chosenSubclasses);
   }
 
   if (!chosenWeapon) {
@@ -2304,6 +2460,7 @@ generateButton.addEventListener("click", generateCharacter);
 retryButton.addEventListener("click", loadData);
 rarityFilterSelect.addEventListener("change", () => {
   updateRarityModeControl();
+  renderClassChoiceOptions();
   updateWeightingGuide();
   saveGeneratorSettings();
 });
@@ -2311,7 +2468,10 @@ rarityModeSelect.addEventListener("change", () => {
   updateWeightingGuide();
   saveGeneratorSettings();
 });
-accessFilterSelect.addEventListener("change", saveGeneratorSettings);
+accessFilterSelect.addEventListener("change", () => {
+  renderClassChoiceOptions();
+  saveGeneratorSettings();
+});
 regionToggleSelect.addEventListener("change", () => {
   if (!isRegionEnabled()) {
     lockedSelections.region = null;
@@ -2334,9 +2494,14 @@ regionCheckboxGroups.addEventListener("change", () => {
 });
 sourcePresetSelect.addEventListener("change", () => {
   applySourcePreset();
+  renderClassChoiceOptions();
   saveGeneratorSettings();
 });
-sourceCheckboxGroups.addEventListener("change", saveGeneratorSettings);
+sourceCheckboxGroups.addEventListener("change", () => {
+  renderClassChoiceOptions();
+  saveGeneratorSettings();
+});
+classChoiceSelect.addEventListener("change", saveGeneratorSettings);
 archetypeToggleSelect.addEventListener("change", () => {
   if (!isArchetypeEnabled()) {
     lockedSelections.archetype = null;

@@ -1,14 +1,21 @@
 # PF2E Character Generator Rules Guide
 
-This file explains how the generator decides each card, what the different filters do, and how the cards affect each other.
+This file explains how the generator works in plain English.
 
-It is written as a plain-English guide to the current rules in the app.
+It focuses on:
+
+- how each card is chosen
+- what the filters do
+- how cards affect each other
+- what special rules override the normal random roll
+
+The generator now reads its data from the local workbook at `assets/data/generatordata.xlsx`.
 
 ## Big Picture
 
-When you click `Generate Character`, the app does not simply roll every card independently.
+When you click `Generate Character`, the app does not roll every card independently.
 
-It first applies your active filters, then rolls the character in an order that keeps later choices compatible with earlier ones.
+It first applies the active filters, then builds the character in an order that keeps later choices compatible with earlier ones.
 
 The main order is:
 
@@ -27,7 +34,7 @@ If a card is locked, the generator tries to keep it and roll the rest around it.
 
 ## Global Filters
 
-Most sheet-based content goes through the same three filters before it can be chosen:
+Most data goes through three main filters before it can be chosen:
 
 1. Rarity filter
 2. Society access filter
@@ -84,7 +91,7 @@ The Society filter can:
 
 There is one special rule here:
 
-- if any active source is an `Adventure Path` or `Adventure Module`, the generator ignores Society Limited and Society Restricted flags entirely
+- if any active source is an `Adventure Path` or `Adventure Module`, the generator ignores `Society Limited` and `Society Restricted` flags entirely
 
 ## Source Rules
 
@@ -96,7 +103,24 @@ That means manual checkbox changes override the preset.
 
 A row is allowed if at least one of its listed sources is currently checked.
 
-This matters because some rows can now list more than one source in the sheet.
+This matters because some rows can list more than one source in the workbook.
+
+## Remembered Settings
+
+The app can remember generator settings between visits.
+
+When `Remember settings` is on, it saves:
+
+- rarity filter and weighting
+- Society access
+- Region / Archetype / Deity toggles
+- manually chosen class
+- region weighting mode
+- custom continent checkboxes
+- source preset
+- source checkboxes
+
+`Reset to Defaults` restores the generator controls to their default state and clears all current locks.
 
 ## Lock Rules
 
@@ -150,11 +174,24 @@ A background is treated as compatible with a locked region if:
 
 - it names that exact region
 - or it names that region's continent
-- or it has no region/continent restriction at all
+- or it has no region or continent restriction at all
 
 ### Class
 
 Class is rolled from the filtered class pool.
+
+The user can also manually choose a class in `Generation Options`.
+
+If `Random Class` is selected, class rolling works normally.
+If a specific class is selected, the generator tries to use that class instead.
+
+That manual choice still has to fit:
+
+- the active rarity, access, and source filters
+- any locked subclasses
+- any forced archetype requirements
+
+If the chosen class no longer fits the current filters or conflicts with another forced result, the app shows an error instead of silently changing it.
 
 If a locked archetype would conflict with a class of the same name, that class is removed from the pool.
 
@@ -260,13 +297,14 @@ After that, rarity weighting decides the final archetype within that bucket.
 
 Deity can be turned on or off, but some characters are required to have one.
 
-The generator always forces a deity for characters whose class or background has `needs_deity = TRUE`.
+The generator always forces a deity for characters whose class, background, or subclass has `needs_deity = TRUE`.
 
-At the moment that includes:
+Current examples include:
 
 - Cleric
 - Champion
 - Raised by Belief
+- subclasses such as Avenger that are marked `needs_deity = TRUE`
 
 For required-deity characters:
 
@@ -293,8 +331,8 @@ Deity bucket weights:
 
 Regional deity rules:
 
-- if the character’s region is in `Garund`, `Mwangi Gods` count as `Regional`
-- if the character’s region is in `Tian Xia`, `Tian Gods` count as `Regional`
+- if the character's region is in `Garund`, `Mwangi Gods` count as `Regional`
+- if the character's region is in `Tian Xia`, `Tian Gods` count as `Regional`
 - other regions do not get a regional deity category bonus
 
 Ancestral deity rules:
@@ -312,14 +350,34 @@ Favored Weapon is always rolled and shown.
 
 The weapon pool is first filtered to weapons the class can legally use.
 
-Normally, legality comes from the class’s `allowed_weapon_categories`.
+Normally, legality comes from the class's `allowed_weapon_categories`.
 
 There are two important exceptions:
 
-- a class’s `favored_specific_weapons` are always allowed
-- for required-deity characters, the deity’s favored weapon is always allowed
+- a class's `favored_specific_weapons` are always allowed
+- for required-deity characters, the deity's favored weapon is always allowed
 
-After legality is decided, weapons use rarity weighting plus class preferences.
+After legality is decided, extra weapon rules are applied before the final weighted roll.
+
+Key ability rules:
+
+- if the final key ability is `Strength`, the weapon cannot be purely `ranged`
+- if the final key ability is `Dexterity`, the weapon must be `ranged`, `both`, or `finesse`
+- required-deity characters can still keep the deity's favored weapon even if it would normally fail that key-ability rule
+
+Class weapon-trait rules:
+
+- if a class lists `favored_weapon_traits`, the weapon must match at least one of those traits
+- this is an `OR`, not an `AND`
+- for example, `agile, finesse, ranged` means the weapon can be agile or finesse or ranged
+
+Subclass weapon-trait rules:
+
+- if a subclass has a `weapon_trait`, that overrides the class trait list
+- if the subclass trait is `any`, the class trait filter is skipped completely
+- this allows subclasses like `Ruffian` to use any weapon the class otherwise allows
+
+After these filters, weapons use rarity weighting plus class preferences.
 
 Weapon preference bonuses:
 
@@ -331,8 +389,9 @@ Special weapon rules:
 - `Gunslinger`
   - the final weapon pool is forced to its favored weapon groups if any are available
 - required-deity characters
-  - if the deity’s favored weapon is in the legal pool, there is a 90% chance to choose it immediately
+  - if the deity's favored weapon is in the legal pool, there is a 90% chance to choose it immediately
   - only the remaining 10% goes to the normal weighted weapon roll
+  - the deity's favored weapon is allowed through the class trait, subclass trait, and key-ability weapon filters
 
 ## How Cards Influence Each Other
 
@@ -346,8 +405,10 @@ The main links between cards are:
 - Archetype depends on Class, Subclasses, and Ancestry
 - Locked Archetype can force Class or Ancestry constraints
 - Deity can depend on Region and Ancestry for category weighting
-- Deity can be forced by Class or Background
+- Deity can be forced by Class, Background, or Subclass
 - Favored Weapon depends on Class
+- Favored Weapon depends on Key Ability
+- Favored Weapon can depend on subclass weapon-trait overrides
 - Favored Weapon can be strongly influenced by Deity for required-deity characters
 
 ## Weighting Summary
@@ -381,7 +442,7 @@ Used only for:
 - deity category buckets
 - optional `None`
 
-## Notes on “Off” Cards
+## Notes on "Off" Cards
 
 If a card is turned off, that usually means the app does not roll it and shows `Off`.
 
@@ -389,4 +450,4 @@ The main exception is Deity:
 
 - if a character requires a deity, the app still rolls and shows one even if the Deity toggle is off
 
-This is done to avoid invalid results for classes and backgrounds that must have a deity.
+This is done to avoid invalid results for classes, backgrounds, or subclasses that must have a deity.
