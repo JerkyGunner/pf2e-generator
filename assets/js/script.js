@@ -955,12 +955,18 @@ function getCurrentWeaponWeightingItems() {
     const allowedCategories = splitCsvValues(currentCharacter.class.allowed_weapon_categories);
     items.push(`Current class categories: ${allowedCategories.join(", ")}.`);
 
+    const subclassGroups = subclassWeaponGroups(currentCharacter.subclasses || []);
+    const subclassSpecifics = subclassSpecificWeapons(currentCharacter.subclasses || []);
     const subclassTraits = subclassWeaponTraits(currentCharacter.subclasses || []);
     const favoredTraits = splitCsvValues(currentCharacter.class.favored_weapon_traits);
     const favoredGroups = splitCsvValues(currentCharacter.class.favored_weapon_groups);
     const favoredSpecificWeapons = splitCsvValues(currentCharacter.class.favored_specific_weapons);
 
-    if (subclassTraits.includes("any")) {
+    if (subclassSpecifics.length > 0) {
+      items.push(`Current subclass specific-weapon requirement: ${subclassSpecifics.join(", ")}.`);
+    } else if (subclassGroups.length > 0) {
+      items.push(`Current subclass weapon-group requirement: ${subclassGroups.join(", ")}.`);
+    } else if (subclassTraits.includes("any")) {
       items.push("Current subclass overrides trait filtering and allows any weapon the class normally allows.");
     } else if (subclassTraits.length > 0) {
       items.push(`Current subclass weapon trait requirement: ${subclassTraits.join(", ")}.`);
@@ -1811,6 +1817,14 @@ function subclassWeaponTraits(chosenSubclasses) {
   return chosenSubclasses.flatMap(subclass => splitCsvValues(subclass.weapon_trait));
 }
 
+function subclassWeaponGroups(chosenSubclasses) {
+  return chosenSubclasses.flatMap(subclass => splitCsvValues(subclass.weapon_group));
+}
+
+function subclassSpecificWeapons(chosenSubclasses) {
+  return chosenSubclasses.flatMap(subclass => splitCsvValues(subclass.specific_weapon));
+}
+
 function deityFavoredWeapons(chosenDeity) {
   return splitCsvValues(chosenDeity?.favoredWeapon);
 }
@@ -1818,6 +1832,39 @@ function deityFavoredWeapons(chosenDeity) {
 function weaponIsDeityFavored(weapon, chosenDeity) {
   const weaponName = String(weapon.name || "").trim().toLowerCase();
   return deityFavoredWeapons(chosenDeity).includes(weaponName);
+}
+
+function weaponMatchesSubclassRequirements(weapon, chosenSubclasses = []) {
+  const requiredSpecificWeapons = subclassSpecificWeapons(chosenSubclasses);
+  const requiredWeaponGroups = subclassWeaponGroups(chosenSubclasses);
+  const requiredWeaponTraits = subclassWeaponTraits(chosenSubclasses).filter(trait => trait !== "any");
+  const weaponName = String(weapon.name || "").trim().toLowerCase();
+
+  if (requiredSpecificWeapons.length > 0) {
+    return requiredSpecificWeapons.includes(weaponName);
+  }
+
+  if (requiredWeaponGroups.length > 0) {
+    return requiredWeaponGroups.some(group => weaponGroups(weapon).includes(group));
+  }
+
+  if (requiredWeaponTraits.length > 0) {
+    return requiredWeaponTraits.some(trait => {
+      if (trait === "ranged") {
+        const type = weaponType(weapon);
+        return type === "ranged" || type === "both";
+      }
+
+      if (trait === "melee") {
+        const type = weaponType(weapon);
+        return type === "melee" || type === "both";
+      }
+
+      return weaponHasTrait(weapon, trait);
+    });
+  }
+
+  return true;
 }
 
 function weaponMatchesKeyAbility(weapon, chosenKeyAbility) {
@@ -1916,6 +1963,11 @@ function chooseWeapon(chosenClass, chosenDeity, chosenBackground, chosenKeyAbili
   const requiresDeity = characterNeedsDeity(chosenClass, chosenBackground, chosenSubclasses);
   let availableWeapons = applyActiveFilters(weapons).filter(weapon =>
     weaponMatchesAllowedCategories(weapon, chosenClass, chosenDeity, requiresDeity)
+  );
+
+  availableWeapons = availableWeapons.filter(weapon =>
+    (requiresDeity && weaponIsDeityFavored(weapon, chosenDeity))
+      || weaponMatchesSubclassRequirements(weapon, chosenSubclasses)
   );
 
   availableWeapons = availableWeapons.filter(weapon =>
