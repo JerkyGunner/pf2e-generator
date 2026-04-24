@@ -1,35 +1,20 @@
 // ===============================
-// GOOGLE SHEETS CSV LINKS
+// LOCAL WORKBOOK
 // ===============================
-const ancestryCsvUrl =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=0&single=true&output=csv";
+const workbookUrl = "assets/data/generatordata.xlsx";
 
-const heritageCsvUrl =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=653560487&single=true&output=csv";
-
-const backgroundCsvUrl =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=59254066&single=true&output=csv";
-
-const regionCsvUrl =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=1217750278&single=true&output=csv";
-
-const deityCsvUrl =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=1202849080&single=true&output=csv";
-
-const weaponCsvUrl =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=338604730&single=true&output=csv";
-
-const classCsvUrl =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=982187207&single=true&output=csv";
-
-const subclassCsvUrl =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=1804749066&single=true&output=csv";
-
-const archetypeCsvUrl =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=1990304273&single=true&output=csv";
-
-const sourceCsvUrl =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLfWHlGnr19xt1pKXr38f43Bl6174deFGFTM9promg4lR9DNoY-NQb0PxTgh44mhSqSzc53xmnCDih/pub?gid=546607334&single=true&output=csv";
+const workbookSheets = {
+  ancestries: "Ancestries",
+  heritages: "Heritages",
+  backgrounds: "Backgrounds",
+  classes: "Classes",
+  subclasses: "Subclasses",
+  archetypes: "Archetypes",
+  regions: "Regions",
+  deities: "Deities",
+  weapons: "Weapons",
+  sources: "Sources",
+};
 
 // ===============================
 // DATA STORAGE
@@ -1338,78 +1323,45 @@ function weightedRandomItems(array, count) {
   return results;
 }
 
-function parseCsv(csvText) {
-  const rows = [];
-  let currentRow = [];
-  let currentValue = "";
-  let insideQuotes = false;
+function workbookSheetToRows(workbook, sheetName) {
+  const worksheet = workbook.Sheets[sheetName];
 
-  for (let index = 0; index < csvText.length; index += 1) {
-    const character = csvText[index];
-    const nextCharacter = csvText[index + 1];
-
-    // CSV uses double quotes to wrap values that may contain commas or line breaks.
-    if (character === "\"") {
-      // Two quote marks in a row mean the value contains a literal quote character.
-      if (insideQuotes && nextCharacter === "\"") {
-        currentValue += "\"";
-        index += 1;
-      } else {
-        insideQuotes = !insideQuotes;
-      }
-    } else if (character === "," && !insideQuotes) {
-      currentRow.push(currentValue.trim());
-      currentValue = "";
-    } else if ((character === "\n" || character === "\r") && !insideQuotes) {
-      // A line break only ends the row when we are not inside a quoted value.
-      if (character === "\r" && nextCharacter === "\n") {
-        index += 1;
-      }
-
-      currentRow.push(currentValue.trim());
-      currentValue = "";
-
-      if (currentRow.some(value => value !== "")) {
-        rows.push(currentRow);
-      }
-
-      currentRow = [];
-    } else {
-      currentValue += character;
-    }
+  if (!worksheet) {
+    throw new Error(`Workbook is missing the "${sheetName}" sheet.`);
   }
 
-  if (currentValue !== "" || currentRow.length > 0) {
-    currentRow.push(currentValue.trim());
-    rows.push(currentRow);
-  }
-
-  if (rows.length === 0) {
-    return [];
-  }
-
-  const [headers, ...dataRows] = rows;
-
-  return dataRows.map(values => {
-    const row = {};
-
-    headers.forEach((header, index) => {
-      row[header] = values[index] || "";
-    });
-
-    return row;
+  return XLSX.utils.sheet_to_json(worksheet, {
+    defval: "",
+    raw: false,
   });
 }
 
-async function loadCsvData(url) {
-  const response = await fetch(url);
+async function loadWorkbookData() {
+  if (typeof XLSX === "undefined") {
+    throw new Error("The Excel parser did not load.");
+  }
+
+  const response = await fetch(workbookUrl);
 
   if (!response.ok) {
     throw new Error(`Request failed with status ${response.status}`);
   }
 
-  const csvText = await response.text();
-  return parseCsv(csvText);
+  const workbookBuffer = await response.arrayBuffer();
+  const workbook = XLSX.read(workbookBuffer, { type: "array" });
+
+  return {
+    ancestries: workbookSheetToRows(workbook, workbookSheets.ancestries),
+    heritages: workbookSheetToRows(workbook, workbookSheets.heritages),
+    backgrounds: workbookSheetToRows(workbook, workbookSheets.backgrounds),
+    regions: workbookSheetToRows(workbook, workbookSheets.regions),
+    deities: workbookSheetToRows(workbook, workbookSheets.deities),
+    weapons: workbookSheetToRows(workbook, workbookSheets.weapons),
+    classes: workbookSheetToRows(workbook, workbookSheets.classes),
+    subclasses: workbookSheetToRows(workbook, workbookSheets.subclasses),
+    archetypes: workbookSheetToRows(workbook, workbookSheets.archetypes),
+    sourceDefinitions: workbookSheetToRows(workbook, workbookSheets.sources),
+  };
 }
 
 // ===============================
@@ -1426,9 +1378,9 @@ async function loadData() {
   retryButton.hidden = true;
 
   try {
-    // Load every sheet up front so one button click can generate everything
-    // without making more network requests in the middle of a roll.
-    [
+    // Load the workbook once up front so the app can keep using the same
+    // in-memory arrays as before, just without depending on Google Sheets.
+    ({
       ancestries,
       heritages,
       backgrounds,
@@ -1439,18 +1391,7 @@ async function loadData() {
       subclasses,
       archetypes,
       sourceDefinitions,
-    ] = await Promise.all([
-      loadCsvData(ancestryCsvUrl),
-      loadCsvData(heritageCsvUrl),
-      loadCsvData(backgroundCsvUrl),
-      loadCsvData(regionCsvUrl),
-      loadCsvData(deityCsvUrl),
-      loadCsvData(weaponCsvUrl),
-      loadCsvData(classCsvUrl),
-      loadCsvData(subclassCsvUrl),
-      loadCsvData(archetypeCsvUrl),
-      loadCsvData(sourceCsvUrl),
-    ]);
+    } = await loadWorkbookData());
 
     renderSourceCheckboxes();
     renderRegionCheckboxes();
