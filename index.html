@@ -30,7 +30,7 @@
         </div>
 
         <div id="rarityModeGroup" class="control-group">
-          <label for="rarityMode" class="label">Rarity Weighting</label>
+          <label for="rarityMode" class="label">Rarity Preset</label>
           <select id="rarityMode" class="control-input">
             <option value="strong" selected>Common Favored (Common 10, Uncommon 3, Rare 1)</option>
             <option value="light">Balanced (Common 4, Uncommon 3, Rare 2)</option>
@@ -78,8 +78,15 @@
           </select>
         </div>
 
+        <div class="control-group">
+          <label for="startingContinent" class="label">Starting Continent</label>
+          <select id="startingContinent" class="control-input">
+            <option value="" selected>No Preference</option>
+          </select>
+        </div>
+
         <div id="regionModeGroup" class="control-group">
-          <label for="regionMode" class="label">Region Weighting</label>
+          <label for="regionMode" class="label">Region Preset</label>
           <select id="regionMode" class="control-input">
             <option value="inner-sea" selected>Default (Inner Sea)</option>
             <option value="explore">Explore (Non-Inner Sea Favored)</option>
@@ -95,6 +102,116 @@
         <div id="regionCheckboxGroups" class="region-groups"></div>
       </div>
 
+      <details class="weighting-panel custom-weighting-panel">
+        <summary class="weighting-summary">Custom Weighting</summary>
+
+        <div class="weighting-content">
+          <p class="weighting-note">The presets above fill these values for you. You can then edit any number here to fine-tune the generator.</p>
+
+          <details class="weighting-group">
+            <summary class="weighting-group-summary">Rarity</summary>
+            <div class="controls-row weighting-input-grid weighting-group-content">
+              <div class="control-group">
+                <label for="rarityCommonWeight" class="label">Common Weight</label>
+                <input id="rarityCommonWeight" class="control-input weight-input" type="number" min="0" step="1" value="10" />
+              </div>
+              <div class="control-group">
+                <label for="rarityUncommonWeight" class="label">Uncommon Weight</label>
+                <input id="rarityUncommonWeight" class="control-input weight-input" type="number" min="0" step="1" value="3" />
+              </div>
+              <div class="control-group">
+                <label for="rarityRareWeight" class="label">Rare Weight</label>
+                <input id="rarityRareWeight" class="control-input weight-input" type="number" min="0" step="1" value="1" />
+              </div>
+            </div>
+          </details>
+
+          <details class="weighting-group">
+            <summary class="weighting-group-summary">Region</summary>
+            <div class="controls-row weighting-input-grid weighting-group-content">
+              <div class="control-group">
+                <label for="regionInnerSeaWeight" class="label">Avistan/Garund Weight</label>
+                <input id="regionInnerSeaWeight" class="control-input weight-input" type="number" min="0" step="1" value="3" />
+              </div>
+              <div class="control-group">
+                <label for="regionOtherWeight" class="label">Other Continents Weight</label>
+                <input id="regionOtherWeight" class="control-input weight-input" type="number" min="0" step="1" value="1" />
+              </div>
+            </div>
+          </details>
+
+          <details class="weighting-group">
+            <summary class="weighting-group-summary">Deity</summary>
+            <div class="controls-row weighting-input-grid weighting-group-content">
+              <div class="control-group">
+                <label for="deityInnerSeaWeight" class="label">Inner Sea Gods</label>
+                <input id="deityInnerSeaWeight" class="control-input weight-input" type="number" min="0" step="1" value="10" />
+              </div>
+              <div class="control-group">
+                <label for="deityRegionalWeight" class="label">Regional</label>
+                <input id="deityRegionalWeight" class="control-input weight-input" type="number" min="0" step="1" value="10" />
+              </div>
+              <div class="control-group">
+                <label for="deityAncestralWeight" class="label">Ancestral</label>
+                <input id="deityAncestralWeight" class="control-input weight-input" type="number" min="0" step="1" value="8" />
+              </div>
+              <div class="control-group">
+                <label for="deityPantheonWeight" class="label">Pantheon</label>
+                <input id="deityPantheonWeight" class="control-input weight-input" type="number" min="0" step="1" value="3" />
+              </div>
+              <div class="control-group">
+                <label for="deityFaithWeight" class="label">Faiths & Philosophies</label>
+                <input id="deityFaithWeight" class="control-input weight-input" type="number" min="0" step="1" value="2" />
+              </div>
+              <div class="control-group">
+                <label for="deityOtherWeight" class="label">Other Gods</label>
+                <input id="deityOtherWeight" class="control-input weight-input" type="number" min="0" step="1" value="3" />
+              </div>
+              <div class="control-group">
+                <label for="deityRemainingWeight" class="label">Remaining Gods</label>
+                <input id="deityRemainingWeight" class="control-input weight-input" type="number" min="0" step="1" value="1" />
+              </div>
+              <div class="control-group">
+                <label for="deityNoneWeight" class="label">No Deity</label>
+                <input id="deityNoneWeight" class="control-input weight-input" type="number" min="0" step="1" value="5" />
+              </div>
+            </div>
+          </details>
+
+          <details class="weighting-group">
+            <summary class="weighting-group-summary">Archetype</summary>
+            <div class="controls-row weighting-input-grid weighting-group-content">
+              <div class="control-group">
+                <label for="archetypeClassWeight" class="label">Class Archetype Weight</label>
+                <input id="archetypeClassWeight" class="control-input weight-input" type="number" min="0" step="1" value="1" />
+              </div>
+              <div class="control-group">
+                <label for="archetypeOtherWeight" class="label">Other Archetype Weight</label>
+                <input id="archetypeOtherWeight" class="control-input weight-input" type="number" min="0" step="1" value="1" />
+              </div>
+            </div>
+          </details>
+
+          <details class="weighting-group">
+            <summary class="weighting-group-summary">Weapon</summary>
+            <div class="controls-row weighting-input-grid weighting-group-content">
+              <div class="control-group">
+                <label for="weaponGroupMultiplier" class="label">Group Preference Multiplier</label>
+                <input id="weaponGroupMultiplier" class="control-input weight-input" type="number" min="0" step="1" value="3" />
+              </div>
+              <div class="control-group">
+                <label for="weaponSpecificMultiplier" class="label">Specific Weapon Multiplier</label>
+                <input id="weaponSpecificMultiplier" class="control-input weight-input" type="number" min="0" step="1" value="5" />
+              </div>
+              <div class="control-group">
+                <label for="deityWeaponChance" class="label">Deity Weapon Direct Chance (%)</label>
+                <input id="deityWeaponChance" class="control-input weight-input" type="number" min="0" max="100" step="1" value="90" />
+              </div>
+            </div>
+          </details>
+        </div>
+      </details>
+
     <details class="weighting-panel">
       <summary class="weighting-summary">Weighting Guide</summary>
 
@@ -102,6 +219,11 @@
           <details class="weighting-group">
             <summary class="weighting-group-summary">Rarity</summary>
             <div id="rarityWeightingGuide" class="weighting-list weighting-group-content"></div>
+          </details>
+
+          <details class="weighting-group">
+            <summary class="weighting-group-summary">Starting Continent</summary>
+            <div id="startingContinentWeightingGuide" class="weighting-list weighting-group-content"></div>
           </details>
 
           <details class="weighting-group">

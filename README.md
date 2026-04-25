@@ -115,6 +115,7 @@ When `Remember settings` is on, it saves:
 - Society access
 - Region / Archetype / Deity toggles
 - manually chosen class
+- starting continent
 - region weighting mode
 - custom continent checkboxes
 - source preset
@@ -155,6 +156,21 @@ If two locks directly conflict, the app stops and shows an error instead of maki
 ### Ancestry
 
 Ancestry is rolled from the currently allowed ancestry pool using the active rarity, Society access, and source rules.
+
+The user can also pick a `Starting Continent` in `Generation Options`.
+
+If one is selected:
+
+- ancestries use the matching continent-specific rarity column when it is filled in
+- the normal rarity column is still used when that continent column is blank
+
+Current continent-specific ancestry columns include:
+
+- `rarity_avistan`
+- `rarity_garund`
+- `rarity_tianxia`
+- `rarity_casmaron`
+- `rarity_arcadia`
 
 If Heritage is locked first, ancestry is pulled from that locked heritage.
 
@@ -247,6 +263,8 @@ If it is on, region is decided like this:
 2. Otherwise, if the background has a `continent`, choose a region from inside that continent.
 3. Otherwise, use the normal region weighting system.
 
+If `Starting Continent` is selected and the background does not already force a region or continent, the free region roll is taken from that chosen continent directly.
+
 Normal region weighting works in two steps:
 
 1. Roll a continent.
@@ -286,12 +304,12 @@ Current checks include:
 
 Then the archetype roll works in two stages:
 
-1. 50% chance to try `Class` archetypes
-2. 50% chance to try `Other` archetypes
+1. roll between `Class` and `Other` using the current archetype weights
+2. choose inside that side using the normal rarity weighting
 
 If the chosen side is empty, it falls back to the other side.
 
-After that, rarity weighting decides the final archetype within that bucket.
+By default the Class and Other archetype weights are both `1`, which makes it behave like a 50/50 split.
 
 ### Deity
 
@@ -371,9 +389,11 @@ Class weapon-trait rules:
 - this is an `OR`, not an `AND`
 - for example, `agile, finesse, ranged` means the weapon can be agile or finesse or ranged
 
-Subclass weapon-trait rules:
+Subclass weapon requirements:
 
-- if a subclass has a `weapon_trait`, that overrides the class trait list
+- if a subclass has a `specific_weapon`, only that exact weapon is allowed
+- if a subclass has a `weapon_group`, the weapon must match one of those groups
+- if a subclass has a `weapon_trait`, the weapon must match one of those traits
 - if the subclass trait is `any`, the class trait filter is skipped completely
 - this allows subclasses like `Ruffian` to use any weapon the class otherwise allows
 
@@ -381,17 +401,19 @@ After these filters, weapons use rarity weighting plus class preferences.
 
 Weapon preference bonuses:
 
-- matching a favored weapon group: x3
-- matching a favored specific weapon: x5
+- matching a favored weapon group: x3 by default
+- matching a favored specific weapon: x5 by default
 
 Special weapon rules:
 
 - `Gunslinger`
   - the final weapon pool is forced to its favored weapon groups if any are available
 - required-deity characters
-  - if the deity's favored weapon is in the legal pool, there is a 90% chance to choose it immediately
+  - if the deity's favored weapon is in the legal pool, there is a direct-roll chance to choose it immediately
   - only the remaining 10% goes to the normal weighted weapon roll
   - the deity's favored weapon is allowed through the class trait, subclass trait, and key-ability weapon filters
+
+The default direct-roll chance is `90%`, but this can now be changed in the custom weighting controls.
 
 ## How Cards Influence Each Other
 
@@ -415,7 +437,7 @@ The main links between cards are:
 
 The generator does not use one single weighting system for everything.
 
-It uses three main systems:
+It uses several weighting systems, and most of them can now be edited directly by the user.
 
 ### Standard rarity weighting
 
@@ -435,12 +457,51 @@ Used only for:
 
 - continent choice before region rolling
 
+### Starting continent ancestry rarity overrides
+
+Used only for:
+
+- ancestry rarity changes when a starting continent is selected
+
+### Archetype type weighting
+
+Used only for:
+
+- the split between `Class` archetypes and `Other` archetypes
+
 ### Deity bucket weighting
 
 Used only for:
 
 - deity category buckets
 - optional `None`
+
+### Weapon preference weighting
+
+Used only for:
+
+- favored weapon groups
+- favored specific weapons
+- direct deity-favored-weapon chance for required-deity characters
+
+## Custom Weighting
+
+The app still provides presets, but users can now edit the numbers directly in `Custom Weighting`.
+
+Current editable groups are:
+
+- rarity weights
+- region weights
+- deity bucket weights
+- archetype Class vs Other weights
+- weapon group and specific-weapon multipliers
+- deity favored weapon direct-roll chance
+
+The presets now act as starting values:
+
+- changing a rarity preset fills the rarity numbers
+- changing a region preset fills the region numbers
+- after that, the user can adjust the numbers however they want
 
 ## Notes on "Off" Cards
 

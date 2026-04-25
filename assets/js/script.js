@@ -54,8 +54,27 @@ const regionToggleSelect = document.getElementById("regionToggle");
 const archetypeToggleSelect = document.getElementById("archetypeToggle");
 const deityToggleSelect = document.getElementById("deityToggle");
 const classChoiceSelect = document.getElementById("classChoice");
+const startingContinentSelect = document.getElementById("startingContinent");
 const regionModeGroup = document.getElementById("regionModeGroup");
 const regionModeSelect = document.getElementById("regionMode");
+const rarityCommonWeightInput = document.getElementById("rarityCommonWeight");
+const rarityUncommonWeightInput = document.getElementById("rarityUncommonWeight");
+const rarityRareWeightInput = document.getElementById("rarityRareWeight");
+const regionInnerSeaWeightInput = document.getElementById("regionInnerSeaWeight");
+const regionOtherWeightInput = document.getElementById("regionOtherWeight");
+const deityInnerSeaWeightInput = document.getElementById("deityInnerSeaWeight");
+const deityRegionalWeightInput = document.getElementById("deityRegionalWeight");
+const deityAncestralWeightInput = document.getElementById("deityAncestralWeight");
+const deityPantheonWeightInput = document.getElementById("deityPantheonWeight");
+const deityFaithWeightInput = document.getElementById("deityFaithWeight");
+const deityOtherWeightInput = document.getElementById("deityOtherWeight");
+const deityRemainingWeightInput = document.getElementById("deityRemainingWeight");
+const deityNoneWeightInput = document.getElementById("deityNoneWeight");
+const archetypeClassWeightInput = document.getElementById("archetypeClassWeight");
+const archetypeOtherWeightInput = document.getElementById("archetypeOtherWeight");
+const weaponGroupMultiplierInput = document.getElementById("weaponGroupMultiplier");
+const weaponSpecificMultiplierInput = document.getElementById("weaponSpecificMultiplier");
+const deityWeaponChanceInput = document.getElementById("deityWeaponChance");
 const sourcePresetSelect = document.getElementById("sourcePreset");
 const sourceCheckboxGroups = document.getElementById("sourceCheckboxGroups");
 const customRegionGroup = document.getElementById("customRegionGroup");
@@ -65,6 +84,7 @@ const rememberSettingsCheckbox = document.getElementById("rememberSettings");
 const resetDefaultsButton = document.getElementById("resetDefaultsBtn");
 const regionModeHint = document.getElementById("regionModeHint");
 const rarityWeightingGuide = document.getElementById("rarityWeightingGuide");
+const startingContinentWeightingGuide = document.getElementById("startingContinentWeightingGuide");
 const regionWeightingGuide = document.getElementById("regionWeightingGuide");
 const deityWeightingGuide = document.getElementById("deityWeightingGuide");
 const archetypeWeightingGuide = document.getElementById("archetypeWeightingGuide");
@@ -123,12 +143,31 @@ let pendingSettingsToApply = null;
 const defaultGeneratorSettings = {
   rarityFilter: "all",
   rarityMode: "strong",
+  rarityCommonWeight: 10,
+  rarityUncommonWeight: 3,
+  rarityRareWeight: 1,
   accessFilter: "standard-only",
   regionToggle: "on",
   archetypeToggle: "on",
   deityToggle: "on",
   classChoice: "",
+  startingContinent: "",
   regionMode: "inner-sea",
+  regionInnerSeaWeight: 3,
+  regionOtherWeight: 1,
+  deityInnerSeaWeight: 10,
+  deityRegionalWeight: 10,
+  deityAncestralWeight: 8,
+  deityPantheonWeight: 3,
+  deityFaithWeight: 2,
+  deityOtherWeight: 3,
+  deityRemainingWeight: 1,
+  deityNoneWeight: 5,
+  archetypeClassWeight: 1,
+  archetypeOtherWeight: 1,
+  weaponGroupMultiplier: 3,
+  weaponSpecificMultiplier: 5,
+  deityWeaponChance: 90,
   sourcePreset: "core-rulebooks-lost-omens",
 };
 
@@ -165,6 +204,48 @@ function updateRegionModeHint() {
   regionModeHint.textContent = regionModeOptions[regionModeSelect.value] || "";
 }
 
+function applyRarityPresetWeights() {
+  const rarityFilter = rarityFilterSelect.value;
+  const rarityMode = rarityModeSelect.value;
+
+  if (rarityMode === "off") {
+    rarityCommonWeightInput.value = 1;
+    rarityUncommonWeightInput.value = 1;
+    rarityRareWeightInput.value = 1;
+    return;
+  }
+
+  if (rarityMode === "light") {
+    rarityCommonWeightInput.value = 4;
+    rarityUncommonWeightInput.value = 3;
+    rarityRareWeightInput.value = rarityFilter === "all" ? 2 : 1;
+    return;
+  }
+
+  rarityCommonWeightInput.value = rarityFilter === "common-uncommon" ? 6 : 10;
+  rarityUncommonWeightInput.value = 3;
+  rarityRareWeightInput.value = 1;
+}
+
+function applyRegionPresetWeights() {
+  if (regionModeSelect.value === "explore") {
+    regionInnerSeaWeightInput.value = 1;
+    regionOtherWeightInput.value = 3;
+    return;
+  }
+
+  if (regionModeSelect.value === "balanced") {
+    regionInnerSeaWeightInput.value = 1;
+    regionOtherWeightInput.value = 1;
+    return;
+  }
+
+  if (regionModeSelect.value === "inner-sea") {
+    regionInnerSeaWeightInput.value = 3;
+    regionOtherWeightInput.value = 1;
+  }
+}
+
 function applyTheme(theme) {
   if (theme === "dark" || theme === "light") {
     document.body.dataset.theme = theme;
@@ -198,6 +279,63 @@ function getDefaultGeneratorSettings() {
     ...defaultGeneratorSettings,
     selectedSources: null,
     selectedContinents: null,
+  };
+}
+
+function numberInputValue(input, fallback) {
+  const parsedValue = Number(input.value);
+
+  if (!Number.isFinite(parsedValue)) {
+    return fallback;
+  }
+
+  return Math.max(0, parsedValue);
+}
+
+function integerInputValue(input, fallback) {
+  return Math.round(numberInputValue(input, fallback));
+}
+
+function rarityWeights() {
+  return {
+    common: integerInputValue(rarityCommonWeightInput, defaultGeneratorSettings.rarityCommonWeight),
+    uncommon: integerInputValue(rarityUncommonWeightInput, defaultGeneratorSettings.rarityUncommonWeight),
+    rare: integerInputValue(rarityRareWeightInput, defaultGeneratorSettings.rarityRareWeight),
+  };
+}
+
+function regionWeights() {
+  return {
+    innerSea: integerInputValue(regionInnerSeaWeightInput, defaultGeneratorSettings.regionInnerSeaWeight),
+    other: integerInputValue(regionOtherWeightInput, defaultGeneratorSettings.regionOtherWeight),
+  };
+}
+
+function deityWeights() {
+  return {
+    innerSea: integerInputValue(deityInnerSeaWeightInput, defaultGeneratorSettings.deityInnerSeaWeight),
+    regional: integerInputValue(deityRegionalWeightInput, defaultGeneratorSettings.deityRegionalWeight),
+    ancestral: integerInputValue(deityAncestralWeightInput, defaultGeneratorSettings.deityAncestralWeight),
+    pantheon: integerInputValue(deityPantheonWeightInput, defaultGeneratorSettings.deityPantheonWeight),
+    faith: integerInputValue(deityFaithWeightInput, defaultGeneratorSettings.deityFaithWeight),
+    other: integerInputValue(deityOtherWeightInput, defaultGeneratorSettings.deityOtherWeight),
+    remaining: integerInputValue(deityRemainingWeightInput, defaultGeneratorSettings.deityRemainingWeight),
+    none: integerInputValue(deityNoneWeightInput, defaultGeneratorSettings.deityNoneWeight),
+  };
+}
+
+function archetypeWeights() {
+  return {
+    classWeight: integerInputValue(archetypeClassWeightInput, defaultGeneratorSettings.archetypeClassWeight),
+    otherWeight: integerInputValue(archetypeOtherWeightInput, defaultGeneratorSettings.archetypeOtherWeight),
+  };
+}
+
+function weaponWeights() {
+  return {
+    groupMultiplier: integerInputValue(weaponGroupMultiplierInput, defaultGeneratorSettings.weaponGroupMultiplier),
+    specificMultiplier: integerInputValue(weaponSpecificMultiplierInput, defaultGeneratorSettings.weaponSpecificMultiplier),
+    deityChance: numberInputValue(deityWeaponChanceInput, defaultGeneratorSettings.deityWeaponChance),
   };
 }
 
@@ -240,16 +378,40 @@ function getSavedGeneratorSettings() {
 function collectCurrentSettings() {
   const sourceInputs = sourceCheckboxGroups.querySelectorAll("input[type=\"checkbox\"]");
   const regionInputs = regionCheckboxGroups.querySelectorAll("input[type=\"checkbox\"]");
+  const currentRarityWeights = rarityWeights();
+  const currentRegionWeights = regionWeights();
+  const currentDeityWeights = deityWeights();
+  const currentArchetypeWeights = archetypeWeights();
+  const currentWeaponWeights = weaponWeights();
 
   return {
     rarityFilter: rarityFilterSelect.value,
     rarityMode: rarityModeSelect.value,
+    rarityCommonWeight: currentRarityWeights.common,
+    rarityUncommonWeight: currentRarityWeights.uncommon,
+    rarityRareWeight: currentRarityWeights.rare,
     accessFilter: accessFilterSelect.value,
     regionToggle: regionToggleSelect.value,
     archetypeToggle: archetypeToggleSelect.value,
     deityToggle: deityToggleSelect.value,
     classChoice: classChoiceSelect.value,
+    startingContinent: startingContinentSelect.value,
     regionMode: regionModeSelect.value,
+    regionInnerSeaWeight: currentRegionWeights.innerSea,
+    regionOtherWeight: currentRegionWeights.other,
+    deityInnerSeaWeight: currentDeityWeights.innerSea,
+    deityRegionalWeight: currentDeityWeights.regional,
+    deityAncestralWeight: currentDeityWeights.ancestral,
+    deityPantheonWeight: currentDeityWeights.pantheon,
+    deityFaithWeight: currentDeityWeights.faith,
+    deityOtherWeight: currentDeityWeights.other,
+    deityRemainingWeight: currentDeityWeights.remaining,
+    deityNoneWeight: currentDeityWeights.none,
+    archetypeClassWeight: currentArchetypeWeights.classWeight,
+    archetypeOtherWeight: currentArchetypeWeights.otherWeight,
+    weaponGroupMultiplier: currentWeaponWeights.groupMultiplier,
+    weaponSpecificMultiplier: currentWeaponWeights.specificMultiplier,
+    deityWeaponChance: currentWeaponWeights.deityChance,
     sourcePreset: sourcePresetSelect.value,
     selectedSources: sourceInputs.length > 0
       ? [...sourceInputs].filter(input => input.checked).map(input => input.value)
@@ -277,12 +439,31 @@ function applyGeneratorSettings(settings = {}) {
   rarityFilterSelect.value = resolvedSettings.rarityFilter;
   updateRarityModeControl();
   rarityModeSelect.value = resolvedSettings.rarityMode;
+  rarityCommonWeightInput.value = resolvedSettings.rarityCommonWeight;
+  rarityUncommonWeightInput.value = resolvedSettings.rarityUncommonWeight;
+  rarityRareWeightInput.value = resolvedSettings.rarityRareWeight;
   accessFilterSelect.value = resolvedSettings.accessFilter;
   regionToggleSelect.value = resolvedSettings.regionToggle;
   archetypeToggleSelect.value = resolvedSettings.archetypeToggle;
   deityToggleSelect.value = resolvedSettings.deityToggle;
   renderClassChoiceOptions(resolvedSettings.classChoice);
+  renderStartingContinentOptions(resolvedSettings.startingContinent);
   regionModeSelect.value = resolvedSettings.regionMode;
+  regionInnerSeaWeightInput.value = resolvedSettings.regionInnerSeaWeight;
+  regionOtherWeightInput.value = resolvedSettings.regionOtherWeight;
+  deityInnerSeaWeightInput.value = resolvedSettings.deityInnerSeaWeight;
+  deityRegionalWeightInput.value = resolvedSettings.deityRegionalWeight;
+  deityAncestralWeightInput.value = resolvedSettings.deityAncestralWeight;
+  deityPantheonWeightInput.value = resolvedSettings.deityPantheonWeight;
+  deityFaithWeightInput.value = resolvedSettings.deityFaithWeight;
+  deityOtherWeightInput.value = resolvedSettings.deityOtherWeight;
+  deityRemainingWeightInput.value = resolvedSettings.deityRemainingWeight;
+  deityNoneWeightInput.value = resolvedSettings.deityNoneWeight;
+  archetypeClassWeightInput.value = resolvedSettings.archetypeClassWeight;
+  archetypeOtherWeightInput.value = resolvedSettings.archetypeOtherWeight;
+  weaponGroupMultiplierInput.value = resolvedSettings.weaponGroupMultiplier;
+  weaponSpecificMultiplierInput.value = resolvedSettings.weaponSpecificMultiplier;
+  deityWeaponChanceInput.value = resolvedSettings.deityWeaponChance;
   sourcePresetSelect.value = resolvedSettings.sourcePreset;
 
   updateRegionModeControl();
@@ -408,8 +589,67 @@ function normalizeContinentName(value) {
   return String(value || "").trim();
 }
 
+function selectedStartingContinent() {
+  return normalizeContinentName(startingContinentSelect.value);
+}
+
+function selectedAncestryRarityColumn() {
+  const continent = selectedStartingContinent().toLowerCase();
+
+  if (continent === "avistan") {
+    return "rarity_avistan";
+  }
+
+  if (continent === "garund") {
+    return "rarity_garund";
+  }
+
+  if (continent === "tian xia") {
+    return "rarity_tianxia";
+  }
+
+  if (continent === "casmaron") {
+    return "rarity_casmaron";
+  }
+
+  if (continent === "arcadia") {
+    return "rarity_arcadia";
+  }
+
+  return "";
+}
+
 function normalizeRarity(item) {
+  const ancestryRarityColumn = selectedAncestryRarityColumn();
+  const ancestryOverride = ancestryRarityColumn
+    ? String(item[ancestryRarityColumn] || "").toLowerCase().trim()
+    : "";
+  const baseRarity = String(item.rarity || "common").toLowerCase().trim();
+
+  return ancestryOverride || baseRarity;
+}
+
+function baseRarity(item) {
   return String(item.rarity || "common").toLowerCase().trim();
+}
+
+function continentOverrideRarity(item, continent) {
+  const normalizedContinent = normalizeContinentName(continent).toLowerCase();
+
+  if (!normalizedContinent) {
+    return "";
+  }
+
+  const columnMap = {
+    avistan: "rarity_avistan",
+    garund: "rarity_garund",
+    "tian xia": "rarity_tianxia",
+    casmaron: "rarity_casmaron",
+    arcadia: "rarity_arcadia",
+  };
+
+  const columnName = columnMap[normalizedContinent];
+  return columnName ? String(item[columnName] || "").toLowerCase().trim() : "";
 }
 
 function isTrueValue(value) {
@@ -453,6 +693,30 @@ function getAvailableContinents() {
       .map(region => normalizeContinentName(region.continent))
       .filter(continent => continent !== "")
   )].sort((a, b) => a.localeCompare(b));
+}
+
+function renderStartingContinentOptions(preferredValue = startingContinentSelect.value) {
+  const normalizedPreferredValue = normalizeContinentName(preferredValue).toLowerCase();
+
+  startingContinentSelect.replaceChildren();
+
+  const noneOption = document.createElement("option");
+  noneOption.value = "";
+  noneOption.textContent = "No Preference";
+  startingContinentSelect.appendChild(noneOption);
+
+  getAvailableContinents().forEach(continent => {
+    const optionElement = document.createElement("option");
+    optionElement.value = continent;
+    optionElement.textContent = continent;
+    startingContinentSelect.appendChild(optionElement);
+  });
+
+  const hasPreferredValue = [...startingContinentSelect.options].some(
+    option => normalizeContinentName(option.value).toLowerCase() === normalizedPreferredValue
+  );
+
+  startingContinentSelect.value = hasPreferredValue ? preferredValue : "";
 }
 
 function updateArchetypeVisibility() {
@@ -682,11 +946,32 @@ function chooseArchetype(chosenClass, chosenSubclasses, chosenAncestry) {
   const otherArchetypes = matchingArchetypes.filter(
     archetype => String(archetype.type).trim().toLowerCase() === "other"
   );
-  // The user wanted Class vs Other to be a 50/50 split first, and only then
-  // should rarity weighting decide which archetype wins inside that bucket.
-  const chooseClassArchetype = Math.random() < 0.5;
-  const preferredPool = chooseClassArchetype ? classArchetypes : otherArchetypes;
-  const fallbackPool = chooseClassArchetype ? otherArchetypes : classArchetypes;
+  const currentArchetypeWeights = archetypeWeights();
+  const bucketWeights = [
+    { name: "class", weight: currentArchetypeWeights.classWeight, pool: classArchetypes },
+    { name: "other", weight: currentArchetypeWeights.otherWeight, pool: otherArchetypes },
+  ];
+  const availableBuckets = bucketWeights.filter(bucket => bucket.pool.length > 0);
+  const totalBucketWeight = availableBuckets.reduce((sum, bucket) => sum + bucket.weight, 0);
+  let preferredBucket = null;
+
+  if (totalBucketWeight <= 0) {
+    preferredBucket = randomItem(availableBuckets) || null;
+  } else {
+    let remainingWeight = Math.random() * totalBucketWeight;
+
+    for (const bucket of availableBuckets) {
+      remainingWeight -= bucket.weight;
+
+      if (remainingWeight < 0) {
+        preferredBucket = bucket;
+        break;
+      }
+    }
+  }
+
+  const preferredPool = preferredBucket?.pool || [];
+  const fallbackPool = preferredBucket?.name === "class" ? otherArchetypes : classArchetypes;
   const finalPool = preferredPool.length > 0 ? preferredPool : fallbackPool;
 
   return weightedRandomItem(finalPool);
@@ -845,6 +1130,8 @@ function renderWeightingItems(container, items) {
 
 function getCurrentRarityWeightingItems() {
   const allowedRarities = getAllowedRarities();
+  const currentWeights = rarityWeights();
+  const startingContinent = selectedStartingContinent();
 
   if (allowedRarities.length === 1) {
     return [
@@ -853,27 +1140,50 @@ function getCurrentRarityWeightingItems() {
     ];
   }
 
-  if (rarityModeSelect.value === "off") {
+  return [
+    `Allowed rarities: ${allowedRarities.join(", ")}.`,
+    allowedRarities.includes("rare")
+      ? `Current weights: Common ${currentWeights.common}, Uncommon ${currentWeights.uncommon}, Rare ${currentWeights.rare}.`
+      : `Current weights: Common ${currentWeights.common}, Uncommon ${currentWeights.uncommon}.`,
+    startingContinent
+      ? `Ancestries also use continent-specific rarity overrides for ${startingContinent} when those ancestry columns are filled in.`
+      : "Ancestries currently use their normal rarity values.",
+  ];
+}
+
+function getCurrentStartingContinentWeightingItems() {
+  const startingContinent = selectedStartingContinent();
+
+  if (!startingContinent) {
     return [
-      `Allowed rarities: ${allowedRarities.join(", ")}.`,
-      "Every allowed rarity is treated equally.",
+      "No starting continent is selected.",
+      "Ancestries use their normal rarity unless another filter changes the pool.",
     ];
   }
 
-  if (rarityModeSelect.value === "light") {
+  const changedAncestries = filterBySource(filterByAccess(ancestries))
+    .map(ancestry => {
+      const overrideRarity = continentOverrideRarity(ancestry, startingContinent);
+
+      if (!overrideRarity) {
+        return null;
+      }
+
+      return `${ancestry.name}: ${baseRarity(ancestry)} -> ${overrideRarity}`;
+    })
+    .filter(item => item !== null);
+
+  if (changedAncestries.length === 0) {
     return [
-      `Allowed rarities: ${allowedRarities.join(", ")}.`,
-      allowedRarities.includes("rare")
-        ? "Current weights: Common 4, Uncommon 3, Rare 2."
-        : "Current weights: Common 4, Uncommon 3.",
+      `Starting continent is ${startingContinent}.`,
+      "No ancestry entries currently have a special rarity override for that continent.",
     ];
   }
 
   return [
-    `Allowed rarities: ${allowedRarities.join(", ")}.`,
-    allowedRarities.includes("rare")
-      ? "Current weights: Common 10, Uncommon 3, Rare 1."
-      : "Current weights: Common 6, Uncommon 3.",
+    `Starting continent is ${startingContinent}.`,
+    "These ancestries currently change rarity for that continent:",
+    ...changedAncestries,
   ];
 }
 
@@ -890,18 +1200,24 @@ function getCurrentRegionWeightingItems() {
     "If a background only has a continent, the generator keeps that continent and rolls a region inside it.",
     "If a background has neither, the generator rolls a continent first and then a region inside it.",
   ];
+  const currentRegionWeights = regionWeights();
+  const startingContinent = selectedStartingContinent();
+
+  if (startingContinent) {
+    items.push(`Starting Continent is set to ${startingContinent}, so free region rolls use that continent directly.`);
+  }
 
   if (regionModeSelect.value === "inner-sea") {
-    items.push("Current continent weights: Avistan 3, Garund 3, all other continents 1.");
+    items.push(`Current continent weights: Avistan ${currentRegionWeights.innerSea}, Garund ${currentRegionWeights.innerSea}, all other continents ${currentRegionWeights.other}.`);
   } else if (regionModeSelect.value === "explore") {
-    items.push("Current continent weights: Avistan 1, Garund 1, all other continents 3.");
+    items.push(`Current continent weights: Avistan ${currentRegionWeights.innerSea}, Garund ${currentRegionWeights.innerSea}, all other continents ${currentRegionWeights.other}.`);
   } else if (regionModeSelect.value === "balanced") {
-    items.push("Current continent weights: all continents 1.");
+    items.push(`Current continent weights: all continents use the current numbers, which are Inner Sea ${currentRegionWeights.innerSea} and Other ${currentRegionWeights.other}.`);
   } else {
     const selectedContinents = [...getSelectedCustomContinents()];
     items.push(
       selectedContinents.length > 0
-        ? `Custom mode: only these continents can be rolled, all equally: ${selectedContinents.join(", ")}.`
+        ? `Custom mode: only these continents can be rolled. Inner Sea continents use weight ${currentRegionWeights.innerSea}; other continents use weight ${currentRegionWeights.other}. Selected continents: ${selectedContinents.join(", ")}.`
         : "Custom mode: no continents are currently selected."
     );
   }
@@ -920,7 +1236,7 @@ function getCurrentDeityWeightingItems() {
 
   const items = [
     "The generator rolls a deity bucket first, then rolls a deity inside that bucket.",
-    "Current bucket weights: Gods of the Inner Sea 10, Regional 10, Ancestral 8, Pantheon 3, Faiths & Philosophies 2, Other Gods 3, Remaining Gods 1, None 5.",
+    `Current bucket weights: Gods of the Inner Sea ${deityWeights().innerSea}, Regional ${deityWeights().regional}, Ancestral ${deityWeights().ancestral}, Pantheon ${deityWeights().pantheon}, Faiths & Philosophies ${deityWeights().faith}, Other Gods ${deityWeights().other}, Remaining Gods ${deityWeights().remaining}, None ${deityWeights().none}.`,
   ];
 
   if (!isRegionEnabled()) {
@@ -939,7 +1255,7 @@ function getCurrentArchetypeWeightingItems() {
   }
 
   return [
-    "The generator first tries a 50/50 split between Class archetypes and Other archetypes.",
+    `The generator first tries a weighted split between Class archetypes (${archetypeWeights().classWeight}) and Other archetypes (${archetypeWeights().otherWeight}).`,
     "If the chosen side has no valid archetypes, it falls back to the other side.",
     "Inside the final side, the current rarity weighting is used to choose the archetype.",
   ];
@@ -975,23 +1291,24 @@ function getCurrentWeaponWeightingItems() {
     }
 
     if (favoredGroups.length > 0) {
-      items.push(`Class group preference: ${favoredGroups.join(", ")}.`);
+      items.push(`Class group preference: ${favoredGroups.join(", ")} (multiplier ${weaponWeights().groupMultiplier}).`);
     }
 
     if (favoredSpecificWeapons.length > 0) {
-      items.push(`Class specific-weapon preference: ${favoredSpecificWeapons.join(", ")}.`);
+      items.push(`Class specific-weapon preference: ${favoredSpecificWeapons.join(", ")} (multiplier ${weaponWeights().specificMultiplier}).`);
     }
   } else {
     items.push("Class preferences are applied after a class has been rolled.");
   }
 
-  items.push("If the character must have a deity and the deity's favored weapon is legal for the class, it is weighted very strongly.");
-  items.push("For required-deity characters, there is now a 90% chance to use the legal deity-favored weapon before the normal weapon roll happens.");
+  items.push("If the character must have a deity and the deity's favored weapon is legal for the class, it is strongly favored.");
+  items.push(`For required-deity characters, there is currently a ${weaponWeights().deityChance}% chance to use the legal deity-favored weapon before the normal weapon roll happens.`);
   return items;
 }
 
 function updateWeightingGuide() {
   renderWeightingItems(rarityWeightingGuide, getCurrentRarityWeightingItems());
+  renderWeightingItems(startingContinentWeightingGuide, getCurrentStartingContinentWeightingItems());
   renderWeightingItems(regionWeightingGuide, getCurrentRegionWeightingItems());
   renderWeightingItems(deityWeightingGuide, getCurrentDeityWeightingItems());
   renderWeightingItems(archetypeWeightingGuide, getCurrentArchetypeWeightingItems());
@@ -1009,18 +1326,11 @@ function continentWeight(continent) {
   const normalizedContinent = normalizeContinentName(continent);
   const innerSeaContinents = new Set(["Avistan", "Garund"]);
   const isInnerSeaContinent = innerSeaContinents.has(normalizedContinent);
+  const currentRegionWeights = regionWeights();
 
   // Region weighting is separate from normal rarity weighting because the
   // Regions sheet does not use rarity. Instead, continent choice is weighted.
-  if (regionModeSelect.value === "balanced" || regionModeSelect.value === "custom") {
-    return 1;
-  }
-
-  if (regionModeSelect.value === "explore") {
-    return isInnerSeaContinent ? 1 : 3;
-  }
-
-  return isInnerSeaContinent ? 3 : 1;
+  return isInnerSeaContinent ? currentRegionWeights.innerSea : currentRegionWeights.other;
 }
 
 function weightedRandomContinent(continents) {
@@ -1029,6 +1339,11 @@ function weightedRandomContinent(continents) {
   }
 
   const totalWeight = continents.reduce((sum, continent) => sum + continentWeight(continent), 0);
+
+  if (totalWeight <= 0) {
+    return randomItem(continents);
+  }
+
   let remainingWeight = Math.random() * totalWeight;
 
   for (const continent of continents) {
@@ -1085,8 +1400,13 @@ function chooseRegionFromContinent(continent, sourceText) {
 function chooseRegionFromTab() {
   const regionsByContinent = getRegionsByContinentMap();
   let continentPool = [...regionsByContinent.keys()];
+  const startingContinent = selectedStartingContinent();
 
-  if (regionModeSelect.value === "custom") {
+  if (startingContinent && regionsByContinent.has(startingContinent)) {
+    continentPool = [startingContinent];
+  }
+
+  if (!startingContinent && regionModeSelect.value === "custom") {
     const selectedContinents = getSelectedCustomContinents();
     continentPool = continentPool.filter(continent => selectedContinents.has(continent));
   }
@@ -1303,34 +1623,18 @@ function updateRarityModeControl() {
 }
 
 function rarityWeight(item) {
-  const rarityMode = rarityModeSelect.value;
   const rarity = normalizeRarity(item);
-
-  if (rarityMode === "off") {
-    return 1;
-  }
-
-  if (rarityMode === "light") {
-    if (rarity === "rare") {
-      return 2;
-    }
-
-    if (rarity === "uncommon") {
-      return 3;
-    }
-
-    return 4;
-  }
+  const currentWeights = rarityWeights();
 
   if (rarity === "rare") {
-    return 1;
+    return currentWeights.rare;
   }
 
   if (rarity === "uncommon") {
-    return 3;
+    return currentWeights.uncommon;
   }
 
-  return 10;
+  return currentWeights.common;
 }
 
 function weightedRandomItem(array) {
@@ -1344,6 +1648,10 @@ function weightedRandomItem(array) {
     (sum, item) => sum + rarityWeight(item),
     0
   );
+
+  if (totalWeight <= 0) {
+    return randomItem(array);
+  }
 
   let remainingWeight = Math.random() * totalWeight;
 
@@ -1450,6 +1758,7 @@ async function loadData() {
 
     renderSourceCheckboxes();
     renderRegionCheckboxes();
+    renderStartingContinentOptions();
     applyGeneratorSettings(pendingSettingsToApply || getSavedGeneratorSettings() || getDefaultGeneratorSettings());
     pendingSettingsToApply = null;
     saveGeneratorSettings();
@@ -1615,34 +1924,34 @@ function getDeityBucketName(category, chosenRegion, chosenAncestry) {
 
 function getDeityBucketWeight(bucketName) {
   if (bucketName === "Gods of the Inner Sea") {
-    return 10;
+    return deityWeights().innerSea;
   }
 
   if (bucketName === "Regional") {
-    return 10;
+    return deityWeights().regional;
   }
 
   if (bucketName === "Ancestral") {
-    return 8;
+    return deityWeights().ancestral;
   }
 
   if (bucketName === "Pantheon") {
-    return 3;
+    return deityWeights().pantheon;
   }
 
   if (bucketName === "Faiths & Philosophies") {
-    return 2;
+    return deityWeights().faith;
   }
 
   if (bucketName === "Other Gods") {
-    return 3;
+    return deityWeights().other;
   }
 
   if (bucketName === "None") {
-    return 5;
+    return deityWeights().none;
   }
 
-  return 1;
+  return deityWeights().remaining;
 }
 
 function getDeityBuckets(availableDeities, chosenRegion, chosenAncestry) {
@@ -1682,6 +1991,11 @@ function chooseWeightedDeityBucket(buckets, requiresDeity = false) {
   }
 
   const totalWeight = bucketEntries.reduce((sum, bucket) => sum + bucket.weight, 0);
+
+  if (totalWeight <= 0) {
+    return randomItem(bucketEntries)?.name || null;
+  }
+
   let remainingWeight = Math.random() * totalWeight;
 
   for (const bucket of bucketEntries) {
@@ -1925,13 +2239,14 @@ function weaponPreferenceMultiplier(weapon, chosenClass, chosenDeity, requiresDe
   const weaponName = String(weapon.name || "").trim().toLowerCase();
   const favoredGroups = classFavoredWeaponGroups(chosenClass);
   const favoredWeapons = classFavoredSpecificWeapons(chosenClass);
+  const currentWeaponWeights = weaponWeights();
 
   if (favoredGroups.some(group => weaponGroups(weapon).includes(group))) {
-    multiplier *= 3;
+    multiplier *= currentWeaponWeights.groupMultiplier;
   }
 
   if (favoredWeapons.includes(weaponName)) {
-    multiplier *= 5;
+    multiplier *= currentWeaponWeights.specificMultiplier;
   }
 
   return multiplier;
@@ -1946,6 +2261,11 @@ function weightedRandomWeapon(weaponPool, chosenClass, chosenDeity, requiresDeit
     (sum, weapon) => sum + (rarityWeight(weapon) * weaponPreferenceMultiplier(weapon, chosenClass, chosenDeity, requiresDeity)),
     0
   );
+
+  if (totalWeight <= 0) {
+    return randomItem(weaponPool);
+  }
+
   let remainingWeight = Math.random() * totalWeight;
 
   for (const weapon of weaponPool) {
@@ -1999,8 +2319,9 @@ function chooseWeapon(chosenClass, chosenDeity, chosenBackground, chosenKeyAbili
   // weighted weapon roll about 1 time in 10.
   if (requiresDeity) {
     const legalFavoredWeapon = findLegalDeityFavoredWeapon(availableWeapons, chosenDeity);
+    const deityWeaponChance = weaponWeights().deityChance / 100;
 
-    if (legalFavoredWeapon && Math.random() < 0.9) {
+    if (legalFavoredWeapon && Math.random() < deityWeaponChance) {
       return {
         name: legalFavoredWeapon.name,
         sourceText: legalFavoredWeapon.source,
@@ -2512,16 +2833,22 @@ generateButton.addEventListener("click", generateCharacter);
 retryButton.addEventListener("click", loadData);
 rarityFilterSelect.addEventListener("change", () => {
   updateRarityModeControl();
+  applyRarityPresetWeights();
   renderClassChoiceOptions();
   updateWeightingGuide();
   saveGeneratorSettings();
 });
 rarityModeSelect.addEventListener("change", () => {
+  applyRarityPresetWeights();
   updateWeightingGuide();
   saveGeneratorSettings();
 });
 accessFilterSelect.addEventListener("change", () => {
   renderClassChoiceOptions();
+  saveGeneratorSettings();
+});
+startingContinentSelect.addEventListener("change", () => {
+  updateWeightingGuide();
   saveGeneratorSettings();
 });
 regionToggleSelect.addEventListener("change", () => {
@@ -2536,6 +2863,7 @@ regionToggleSelect.addEventListener("change", () => {
   saveGeneratorSettings();
 });
 regionModeSelect.addEventListener("change", () => {
+  applyRegionPresetWeights();
   updateRegionModeControl();
   updateWeightingGuide();
   saveGeneratorSettings();
@@ -2611,6 +2939,12 @@ lockButtons.deity.addEventListener("click", () => toggleLock("deity"));
 lockButtons.weapon.addEventListener("click", () => toggleLock("weapon"));
 lockButtons.archetype.addEventListener("click", () => toggleLock("archetype"));
 lockButtons.subclasses.addEventListener("click", () => toggleLock("subclasses"));
+document.querySelectorAll(".weight-input").forEach(input => {
+  input.addEventListener("input", () => {
+    updateWeightingGuide();
+    saveGeneratorSettings();
+  });
+});
 updateLockButtons();
 initializeRememberSettingsPreference();
 pendingSettingsToApply = isRememberSettingsEnabled()
