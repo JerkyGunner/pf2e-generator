@@ -2097,8 +2097,11 @@ function weaponHasTrait(weapon, traitName) {
   return isTrueValue(weapon[normalizedTraitName]);
 }
 
-function weaponMatchesAllowedCategories(weapon, chosenClass, chosenDeity = null, requiresDeity = false) {
-  const allowedCategories = splitCsvValues(chosenClass.allowed_weapon_categories);
+function weaponMatchesAllowedCategories(weapon, chosenClass, chosenSubclasses = [], chosenDeity = null, requiresDeity = false) {
+  const allowedCategories = [
+    ...splitCsvValues(chosenClass.allowed_weapon_categories),
+    ...subclassWeaponTypeAdds(chosenSubclasses),
+  ];
   const favoredWeapons = classFavoredSpecificWeapons(chosenClass);
   const deityWeapons = deityFavoredWeapons(chosenDeity);
   const weaponCategory = String(weapon.category || "").trim().toLowerCase();
@@ -2112,7 +2115,7 @@ function weaponMatchesAllowedCategories(weapon, chosenClass, chosenDeity = null,
     return true;
   }
 
-  return allowedCategories.includes(weaponCategory);
+  return [...new Set(allowedCategories)].includes(weaponCategory);
 }
 
 function classFavoredWeaponGroups(chosenClass) {
@@ -2125,6 +2128,14 @@ function classFavoredSpecificWeapons(chosenClass) {
 
 function classFavoredWeaponTraits(chosenClass) {
   return splitCsvValues(chosenClass.favored_weapon_traits);
+}
+
+function subclassWeaponTypes(chosenSubclasses) {
+  return chosenSubclasses.flatMap(subclass => splitCsvValues(subclass.weapon_type));
+}
+
+function subclassWeaponTypeAdds(chosenSubclasses) {
+  return chosenSubclasses.flatMap(subclass => splitCsvValues(subclass.weapon_type_add));
 }
 
 function subclassWeaponTraits(chosenSubclasses) {
@@ -2148,37 +2159,81 @@ function weaponIsDeityFavored(weapon, chosenDeity) {
   return deityFavoredWeapons(chosenDeity).includes(weaponName);
 }
 
-function weaponMatchesSubclassRequirements(weapon, chosenSubclasses = []) {
-  const requiredSpecificWeapons = subclassSpecificWeapons(chosenSubclasses);
-  const requiredWeaponGroups = subclassWeaponGroups(chosenSubclasses);
-  const requiredWeaponTraits = subclassWeaponTraits(chosenSubclasses).filter(trait => trait !== "any");
+function weaponMatchesTypeRequirement(weapon, requiredTypes = []) {
+  if (requiredTypes.length === 0) {
+    return true;
+  }
+
+  const type = weaponType(weapon);
+
+  return requiredTypes.some(requiredType => {
+    if (requiredType === "ranged") {
+      return type === "ranged" || type === "both";
+    }
+
+    if (requiredType === "melee") {
+      return type === "melee" || type === "both";
+    }
+
+    return type === requiredType;
+  });
+}
+
+function subclassHasWeaponRequirements(subclass) {
+  return (
+    splitCsvValues(subclass.specific_weapon).length > 0
+    || splitCsvValues(subclass.weapon_group).length > 0
+    || splitCsvValues(subclass.weapon_trait).filter(trait => trait !== "any").length > 0
+    || subclassWeaponTypes([subclass]).length > 0
+  );
+}
+
+function weaponMatchesSubclassRequirement(weapon, subclass) {
+  const requiredSpecificWeapons = splitCsvValues(subclass.specific_weapon);
+  const requiredWeaponGroups = splitCsvValues(subclass.weapon_group);
+  const requiredWeaponTraits = splitCsvValues(subclass.weapon_trait).filter(trait => trait !== "any");
+  const requiredWeaponTypes = subclassWeaponTypes([subclass]);
   const weaponName = String(weapon.name || "").trim().toLowerCase();
 
-  if (requiredSpecificWeapons.length > 0) {
-    return requiredSpecificWeapons.includes(weaponName);
+  if (requiredSpecificWeapons.length > 0 && !requiredSpecificWeapons.includes(weaponName)) {
+    return false;
   }
 
-  if (requiredWeaponGroups.length > 0) {
-    return requiredWeaponGroups.some(group => weaponGroups(weapon).includes(group));
+  if (
+    requiredWeaponGroups.length > 0
+    && !requiredWeaponGroups.some(group => weaponGroups(weapon).includes(group))
+  ) {
+    return false;
   }
 
-  if (requiredWeaponTraits.length > 0) {
-    return requiredWeaponTraits.some(trait => {
-      if (trait === "ranged") {
-        const type = weaponType(weapon);
-        return type === "ranged" || type === "both";
-      }
-
-      if (trait === "melee") {
-        const type = weaponType(weapon);
-        return type === "melee" || type === "both";
+  if (
+    requiredWeaponTraits.length > 0
+    && !requiredWeaponTraits.some(trait => {
+      if (trait === "ranged" || trait === "melee") {
+        return weaponMatchesTypeRequirement(weapon, [trait]);
       }
 
       return weaponHasTrait(weapon, trait);
-    });
+    })
+  ) {
+    return false;
+  }
+
+  if (!weaponMatchesTypeRequirement(weapon, requiredWeaponTypes)) {
+    return false;
   }
 
   return true;
+}
+
+function weaponMatchesSubclassRequirements(weapon, chosenSubclasses = []) {
+  return chosenSubclasses.every(subclass => {
+    if (!subclassHasWeaponRequirements(subclass)) {
+      return true;
+    }
+
+    return weaponMatchesSubclassRequirement(weapon, subclass);
+  });
 }
 
 function weaponMatchesKeyAbility(weapon, chosenKeyAbility) {
@@ -2282,7 +2337,7 @@ function weightedRandomWeapon(weaponPool, chosenClass, chosenDeity, requiresDeit
 function chooseWeapon(chosenClass, chosenDeity, chosenBackground, chosenKeyAbility, chosenSubclasses) {
   const requiresDeity = characterNeedsDeity(chosenClass, chosenBackground, chosenSubclasses);
   let availableWeapons = applyActiveFilters(weapons).filter(weapon =>
-    weaponMatchesAllowedCategories(weapon, chosenClass, chosenDeity, requiresDeity)
+    weaponMatchesAllowedCategories(weapon, chosenClass, chosenSubclasses, chosenDeity, requiresDeity)
   );
 
   availableWeapons = availableWeapons.filter(weapon =>
