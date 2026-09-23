@@ -2972,17 +2972,6 @@ function rollCharacter(availableAncestries, availableBackgrounds, availableClass
   let chosenArchetype = isArchetypeEnabled() ? lockedSelections.archetype : null;
   const chosenClassName = String(classChoiceSelect.value || "").trim();
 
-  // A locked archetype can imply extra rules, like needing a spellcaster or a
-  // specific ancestry. This helper lines those dependencies up before rolling.
-  ({
-    chosenClass,
-    chosenAncestry: ancestry,
-  } = {
-    chosenClass,
-    chosenAncestry: ancestry,
-    ...syncSelectionsFromLockedArchetype(chosenArchetype, chosenClass, ancestry),
-  });
-
   // A versatile heritage fits any ancestry, so it doesn't pin one down.
   if (!ancestry && heritage && !isVersatileHeritage(heritage)) {
     ancestry = findAncestryByName(heritage.ancestry) || { name: heritage.ancestry };
@@ -3009,12 +2998,25 @@ function rollCharacter(availableAncestries, availableBackgrounds, availableClass
       && String(chosenClass.name).trim().toLowerCase() !== chosenClassName.toLowerCase()
     ) {
       return {
-        error: "The manually chosen class conflicts with another locked or required choice. Unlock the conflicting result or choose Random Class.",
+        error: "The manually chosen class conflicts with the locked Class or Subclasses. Unlock them or choose Random Class.",
       };
     }
 
     chosenClass = manuallyChosenClass;
   }
+
+  // A locked archetype can imply extra rules, like needing a spellcaster or a
+  // specific ancestry. Only the class and ancestry that are still open get
+  // filled in here, so locked, heritage-based, and manual choices come first.
+  // If those don't meet the archetype's rules, findLockConflict reports it.
+  ({
+    chosenClass,
+    chosenAncestry: ancestry,
+  } = {
+    chosenClass,
+    chosenAncestry: ancestry,
+    ...syncSelectionsFromLockedArchetype(chosenArchetype, chosenClass, ancestry),
+  });
 
   if (background && chosenRegion && !isBackgroundCompatibleWithRegion(background, chosenRegion)) {
     return {
