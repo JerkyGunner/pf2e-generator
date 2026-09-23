@@ -29,6 +29,7 @@ let classes = [];
 let subclasses = [];
 let archetypes = [];
 let sourceDefinitions = [];
+let knownSourceNames = new Set();
 let currentCharacter = null;
 
 const lockedSelections = {
@@ -579,10 +580,32 @@ function normalizeSourceName(value) {
 }
 
 function splitSourceValues(value) {
-  return String(value || "")
+  // Rows can list several sources separated by commas, but some source names
+  // contain a comma themselves (e.g. "Absalom, City of Lost Omens"). Split on
+  // commas, then re-join neighbouring pieces whenever together they form a
+  // source name from the Sources sheet, preferring the longest match.
+  const parts = String(value || "")
     .split(",")
     .map(source => normalizeSourceName(source))
     .filter(source => source !== "");
+  const results = [];
+  let index = 0;
+
+  while (index < parts.length) {
+    let matchedEnd = index + 1;
+
+    for (let end = parts.length; end > index + 1; end--) {
+      if (knownSourceNames.has(parts.slice(index, end).join(", "))) {
+        matchedEnd = end;
+        break;
+      }
+    }
+
+    results.push(parts.slice(index, matchedEnd).join(", "));
+    index = matchedEnd;
+  }
+
+  return results;
 }
 
 function normalizeContinentName(value) {
@@ -1755,6 +1778,10 @@ async function loadData() {
       archetypes,
       sourceDefinitions,
     } = await loadWorkbookData());
+
+    knownSourceNames = new Set(
+      sourceDefinitions.map(source => normalizeSourceName(source.source_name))
+    );
 
     renderSourceCheckboxes();
     renderRegionCheckboxes();
