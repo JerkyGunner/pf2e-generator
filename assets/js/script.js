@@ -760,7 +760,10 @@ function renderStartingContinentOptions(preferredValue = startingContinentSelect
 }
 
 function updateArchetypeVisibility() {
-  archetypeSection.hidden = !isArchetypeEnabled();
+  archetypeSection.hidden = !(
+    isArchetypeEnabled()
+    || (currentCharacter?.subclasses || []).some(subclassNeedsCasterArchetype)
+  );
 }
 
 function updateDeityVisibility() {
@@ -967,6 +970,32 @@ function filterArchetypesForCharacter(chosenClass, chosenSubclasses, chosenAnces
 
     return true;
   });
+}
+
+function subclassNeedsCasterArchetype(subclass) {
+  // Subclasses like the Eldritch Trickster racket list "Archetype" as their key
+  // ability: they come with a multiclass dedication for a spellcasting class
+  // and can use that class's key ability.
+  return parseKeyAbilityOptions(subclass.key_ability).some(
+    option => option.toLowerCase() === "archetype"
+  );
+}
+
+function archetypeClass(archetype) {
+  if (!archetype || String(archetype.type).trim().toLowerCase() !== "class") {
+    return null;
+  }
+
+  return findClassByName(archetype.name);
+}
+
+function isCasterClassArchetype(archetype) {
+  return isTrueValue(archetypeClass(archetype)?.is_spellcaster);
+}
+
+function casterClassArchetypesForCharacter(chosenClass, chosenSubclasses, chosenAncestry) {
+  return filterArchetypesForCharacter(chosenClass, chosenSubclasses, chosenAncestry)
+    .filter(isCasterClassArchetype);
 }
 
 function chooseArchetype(chosenClass, chosenSubclasses, chosenAncestry) {
@@ -1330,14 +1359,17 @@ function getCurrentDeityWeightingItems() {
 }
 
 function getCurrentArchetypeWeightingItems() {
+  const casterArchetypeNote = "Eldritch Trickster rogues always get a spellcasting class archetype, even when archetype rolling is off.";
+
   if (!isArchetypeEnabled()) {
-    return ["Archetype rolling is currently turned off."];
+    return ["Archetype rolling is currently turned off.", casterArchetypeNote];
   }
 
   return [
     `The generator first tries a weighted split between Class archetypes (${archetypeWeights().classWeight}) and Other archetypes (${archetypeWeights().otherWeight}).`,
     "If the chosen side has no valid archetypes, it falls back to the other side.",
     "Inside the final side, the current rarity weighting is used to choose the archetype.",
+    casterArchetypeNote,
   ];
 }
 
@@ -2621,10 +2653,18 @@ function findChosenSubclassByType(chosenSubclasses, subclassType) {
   );
 }
 
+function subclassKeyAbilityOptions(subclass, chosenArchetype) {
+  return parseKeyAbilityOptions(subclass.key_ability).flatMap(option =>
+    option.toLowerCase() === "archetype"
+      ? parseKeyAbilityOptions(archetypeClass(chosenArchetype)?.key_ability)
+      : [option]
+  );
+}
+
 /**
  * Decide the final key ability for the character.
  */
-function chooseKeyAbility(chosenClass, chosenSubclasses) {
+function chooseKeyAbility(chosenClass, chosenSubclasses, chosenArchetype = null) {
   const className = chosenClass.name.toLowerCase().trim();
 
   // -------------------------------
@@ -2652,11 +2692,12 @@ function chooseKeyAbility(chosenClass, chosenSubclasses) {
 
   // -------------------------------
   // Special rule: Rogue
-  // Rogue starts with Dexterity, but subclass may add another valid option
+  // Rogue starts with Dexterity, but subclass may add another valid option.
+  // "Archetype" means the key ability of the chosen class archetype.
   // -------------------------------
   if (className === "rogue") {
     const subclassOptions = chosenSubclasses.flatMap(subclass =>
-      parseKeyAbilityOptions(subclass.key_ability)
+      subclassKeyAbilityOptions(subclass, chosenArchetype)
     );
 
     keyAbilityOptions = uniqueValues([...keyAbilityOptions, ...subclassOptions]);
@@ -2683,8 +2724,12 @@ function chooseKeyAbility(chosenClass, chosenSubclasses) {
   }
 
   chosenSubclasses.forEach(subclass => {
-    if (parseKeyAbilityOptions(subclass.key_ability).includes(chosenValue) && subclass.source) {
-      matchingSources.push(`${subclass.name} (${subclass.source})`);
+    if (subclassKeyAbilityOptions(subclass, chosenArchetype).includes(chosenValue) && subclass.source) {
+      matchingSources.push(
+        subclassNeedsCasterArchetype(subclass) && chosenArchetype
+          ? `${subclass.name} via ${chosenArchetype.name} archetype (${subclass.source})`
+          : `${subclass.name} (${subclass.source})`
+      );
     }
   });
 
@@ -2830,17 +2875,49 @@ function generateCharacter() {
     chosenClass = weightedRandomItem(availableClasses);
   }
 
-  // Pick subclass/subclasses
+  // Pick subclass/subclasses. Subclasses that need a spellcasting class
+  // archetype are left out when none can fit (e.g. a non-caster archetype is
+  // locked, or the filters remove every caster class archetype).
+  const canTakeCasterArchetype = chosenArchetype
+    ? isCasterClassArchetype(chosenArchetype)
+    : casterClassArchetypesForCharacter(chosenClass, [], ancestry).length > 0;
   const matchingSubclasses = applyActiveFilters(subclasses).filter(
     subclass => subclass.class.toLowerCase() === chosenClass.name.toLowerCase()
+      && (canTakeCasterArchetype || !subclassNeedsCasterArchetype(subclass))
   );
   if (!chosenSubclasses) {
     chosenSubclasses = chooseSubclassesForClass(chosenClass.name, matchingSubclasses);
   }
 
+  // Subclasses like the Eldritch Trickster racket always come with a
+  // spellcasting class archetype, even when archetype rolling is off.
+  if (chosenSubclasses.some(subclassNeedsCasterArchetype)) {
+    if (chosenArchetype && !isCasterClassArchetype(chosenArchetype)) {
+      setStatusMessageText(
+        "The locked Subclass needs a spellcasting class archetype, but the locked Archetype is not one. Unlock one of them to continue.",
+        true
+      );
+      return;
+    }
+
+    if (!chosenArchetype) {
+      chosenArchetype = weightedRandomItem(
+        casterClassArchetypesForCharacter(chosenClass, chosenSubclasses, ancestry)
+      );
+    }
+
+    if (!chosenArchetype) {
+      setStatusMessageText(
+        "The locked Subclass needs a spellcasting class archetype, but none match the current filters. Unlock Subclasses or allow more options.",
+        true
+      );
+      return;
+    }
+  }
+
   // Pick final key ability
   if (!chosenKeyAbility) {
-    chosenKeyAbility = chooseKeyAbility(chosenClass, chosenSubclasses);
+    chosenKeyAbility = chooseKeyAbility(chosenClass, chosenSubclasses, chosenArchetype);
   }
 
   if (!chosenArchetype) {
@@ -2929,10 +3006,10 @@ function generateCharacter() {
   setValueAndSource(
     "archetypeResult",
     "archetypeSource",
-    isArchetypeEnabled()
-      ? (chosenArchetype ? chosenArchetype.name : "None")
-      : "Off",
-    isArchetypeEnabled() && chosenArchetype ? chosenArchetype.source : ""
+    chosenArchetype
+      ? chosenArchetype.name
+      : (isArchetypeEnabled() ? "None" : "Off"),
+    chosenArchetype ? chosenArchetype.source : ""
   );
 
   // Display subclasses nicely as separate boxes

@@ -255,6 +255,7 @@ Special cases:
   - key ability is taken from the chosen `Subconscious Mind` subclass
 - `Rogue`
   - class options are combined with subclass key-ability options
+  - a subclass key ability of `Archetype` (the `Eldritch Trickster` racket) means the key ability of the character's spellcasting class archetype, so a Wizard archetype adds `Intelligence`
 
 The final key ability is chosen randomly from the valid options.
 
@@ -320,6 +321,11 @@ Then the archetype roll works in two stages:
 If the chosen side is empty, it falls back to the other side.
 
 By default the Class and Other archetype weights are both `1`, which makes it behave like a 50/50 split.
+
+Subclasses whose key ability is `Archetype` (the Rogue's `Eldritch Trickster` racket) always get a `Class` archetype for a spellcasting class, even when archetype rolling is turned off. That archetype is rolled straight after the subclass, using the normal rarity weighting.
+
+- if a locked archetype isn't a spellcasting class archetype, those subclasses are left out of the roll
+- if the subclass is also locked, generation stops with an error
 
 ### Deity
 
