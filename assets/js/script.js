@@ -629,40 +629,14 @@ function selectedStartingContinent() {
   return normalizeContinentName(startingContinentSelect.value);
 }
 
-function selectedAncestryRarityColumn() {
-  const continent = selectedStartingContinent().toLowerCase();
-
-  if (continent === "avistan") {
-    return "rarity_avistan";
-  }
-
-  if (continent === "garund") {
-    return "rarity_garund";
-  }
-
-  if (continent === "tian xia") {
-    return "rarity_tianxia";
-  }
-
-  if (continent === "casmaron") {
-    return "rarity_casmaron";
-  }
-
-  if (continent === "arcadia") {
-    return "rarity_arcadia";
-  }
-
-  return "";
-}
-
 function normalizeRarity(item) {
-  const ancestryRarityColumn = selectedAncestryRarityColumn();
-  const ancestryOverride = ancestryRarityColumn
-    ? String(item[ancestryRarityColumn] || "").toLowerCase().trim()
+  // Only Ancestries rows have continent-specific rarity columns, so the
+  // Starting Continent override applies to them alone.
+  const ancestryOverride = ancestries.includes(item)
+    ? continentOverrideRarity(item, selectedStartingContinent())
     : "";
-  const baseRarity = String(item.rarity || "common").toLowerCase().trim();
 
-  return ancestryOverride || baseRarity;
+  return ancestryOverride || baseRarity(item);
 }
 
 function baseRarity(item) {
