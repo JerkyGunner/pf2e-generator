@@ -2182,6 +2182,18 @@ function weaponHasTrait(weapon, traitName) {
   return isTrueValue(weapon[normalizedTraitName]);
 }
 
+function weaponMatchesTraitRequirement(weapon, traitName) {
+  // "ranged" and "melee" aren't trait columns on the Weapons sheet; they come
+  // from the weapon's type column instead.
+  const normalizedTraitName = String(traitName || "").trim().toLowerCase();
+
+  if (normalizedTraitName === "ranged" || normalizedTraitName === "melee") {
+    return weaponMatchesTypeRequirement(weapon, [normalizedTraitName]);
+  }
+
+  return weaponHasTrait(weapon, normalizedTraitName);
+}
+
 function weaponMatchesAllowedCategories(weapon, chosenClass, chosenSubclasses = [], chosenDeity = null, requiresDeity = false) {
   const allowedCategories = [
     ...splitCsvValues(chosenClass.allowed_weapon_categories),
@@ -2293,13 +2305,7 @@ function weaponMatchesSubclassRequirement(weapon, subclass) {
 
   if (
     requiredWeaponTraits.length > 0
-    && !requiredWeaponTraits.some(trait => {
-      if (trait === "ranged" || trait === "melee") {
-        return weaponMatchesTypeRequirement(weapon, [trait]);
-      }
-
-      return weaponHasTrait(weapon, trait);
-    })
+    && !requiredWeaponTraits.some(trait => weaponMatchesTraitRequirement(weapon, trait))
   ) {
     return false;
   }
@@ -2348,7 +2354,7 @@ function weaponMatchesClassTraits(weapon, chosenClass, chosenSubclasses = [], ch
   }
 
   if (subclassTraits.length > 0) {
-    return subclassTraits.some(trait => weaponHasTrait(weapon, trait));
+    return subclassTraits.some(trait => weaponMatchesTraitRequirement(weapon, trait));
   }
 
   const favoredTraits = classFavoredWeaponTraits(chosenClass);
@@ -2357,7 +2363,7 @@ function weaponMatchesClassTraits(weapon, chosenClass, chosenSubclasses = [], ch
     return true;
   }
 
-  return favoredTraits.some(trait => weaponHasTrait(weapon, trait));
+  return favoredTraits.some(trait => weaponMatchesTraitRequirement(weapon, trait));
 }
 
 function classRequiresFavoredWeaponGroup(chosenClass) {
