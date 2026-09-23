@@ -773,7 +773,7 @@ function updateDeityVisibility() {
     currentCharacter?.class,
     currentCharacter?.background,
     currentCharacter?.subclasses
-  ));
+  ) || archetypeRequiredDeities(currentCharacter?.archetype).length > 0);
 }
 
 function updateWeaponVisibility() {
@@ -932,7 +932,11 @@ function archetypeAllowsTradition(archetype, spellcastingProfile) {
   return allowedTraditions.some(tradition => spellcastingProfile.traditions.includes(tradition));
 }
 
-function archetypeFitsCharacter(archetype, chosenClass, chosenSubclasses, chosenAncestry) {
+function archetypeRequiredDeities(archetype) {
+  return splitCsvValues(archetype?.required_deity);
+}
+
+function archetypeFitsCharacter(archetype, chosenClass, chosenSubclasses, chosenAncestry, chosenDeity = null) {
   const spellcastingProfile = getSpellcastingProfile(chosenClass, chosenSubclasses);
   const classFeatureProfile = getClassFeatureProfile(chosenClass);
 
@@ -969,12 +973,26 @@ function archetypeFitsCharacter(archetype, chosenClass, chosenSubclasses, chosen
     return false;
   }
 
+  // A required deity must match the chosen deity. Before the deity is rolled,
+  // one of the required deities just has to be available.
+  const requiredDeities = archetypeRequiredDeities(archetype);
+
+  if (requiredDeities.length > 0) {
+    const deityNames = chosenDeity
+      ? [chosenDeity.name]
+      : applyAccessAndSourceFilters(deities).map(deity => deity.name);
+
+    if (!deityNames.some(name => requiredDeities.includes(String(name).trim().toLowerCase()))) {
+      return false;
+    }
+  }
+
   return true;
 }
 
-function filterArchetypesForCharacter(chosenClass, chosenSubclasses, chosenAncestry) {
+function filterArchetypesForCharacter(chosenClass, chosenSubclasses, chosenAncestry, chosenDeity = null) {
   return applyActiveFilters(archetypes).filter(archetype =>
-    archetypeFitsCharacter(archetype, chosenClass, chosenSubclasses, chosenAncestry)
+    archetypeFitsCharacter(archetype, chosenClass, chosenSubclasses, chosenAncestry, chosenDeity)
   );
 }
 
@@ -1004,12 +1022,12 @@ function casterClassArchetypesForCharacter(chosenClass, chosenSubclasses, chosen
     .filter(isCasterClassArchetype);
 }
 
-function chooseArchetype(chosenClass, chosenSubclasses, chosenAncestry) {
+function chooseArchetype(chosenClass, chosenSubclasses, chosenAncestry, chosenDeity = null) {
   if (!isArchetypeEnabled()) {
     return null;
   }
 
-  const matchingArchetypes = filterArchetypesForCharacter(chosenClass, chosenSubclasses, chosenAncestry);
+  const matchingArchetypes = filterArchetypesForCharacter(chosenClass, chosenSubclasses, chosenAncestry, chosenDeity);
 
   if (matchingArchetypes.length === 0) {
     return null;
@@ -1360,6 +1378,7 @@ function getCurrentDeityWeightingItems() {
     items.push("Regional bucket means Mwangi Gods for Garund regions and Tian Gods for Tian Xia regions.");
   }
   items.push("Ancestral bucket means Dwarven Gods for Dwarves, Elven Gods for Elves, Goblin Gods for Goblins, and Orc Gods for Orcs.");
+  items.push("If the archetype requires a deity (e.g. Midnight Illusionist), the deity is picked from its required deities instead of the buckets.");
 
   return items;
 }
@@ -2196,12 +2215,27 @@ function chooseDeity(chosenAncestry, chosenRegion, chosenClass, chosenBackground
     };
   }
 
+  return deityResult(deityChoice);
+}
+
+function deityResult(deityRow) {
   return {
-    name: deityChoice.name,
-    sourceText: deityChoice.source,
-    category: deityChoice.category,
-    favoredWeapon: deityChoice.favored_weapon,
+    name: deityRow.name,
+    sourceText: deityRow.source,
+    category: deityRow.category,
+    favoredWeapon: deityRow.favored_weapon,
   };
+}
+
+function chooseRequiredDeity(archetype) {
+  const requiredDeities = archetypeRequiredDeities(archetype);
+  const deityChoice = randomItem(
+    applyAccessAndSourceFilters(deities).filter(deity =>
+      requiredDeities.includes(String(deity.name).trim().toLowerCase())
+    )
+  );
+
+  return deityChoice ? deityResult(deityChoice) : null;
 }
 
 // ===============================
@@ -2827,7 +2861,13 @@ function archetypeRequirementSummary(archetype) {
     requirements.push("focus spells");
   }
 
-  return requirements.join(", ");
+  if (archetype.required_deity) {
+    requirements.push(`a follower of ${listText(archetype.required_deity)}`);
+  }
+
+  return requirements.length > 1
+    ? `${requirements.slice(0, -1).join(", ")} and ${requirements[requirements.length - 1]}`
+    : requirements.join("");
 }
 
 function findLockConflict(character) {
@@ -2865,7 +2905,7 @@ function findLockConflict(character) {
   if (
     isArchetypeEnabled()
     && lockedSelections.archetype
-    && !archetypeFitsCharacter(archetype, chosenClass, chosenSubclasses, ancestry)
+    && !archetypeFitsCharacter(archetype, chosenClass, chosenSubclasses, ancestry, deity || { name: "None" })
   ) {
     const requirements = archetypeRequirementSummary(archetype);
 
@@ -3058,7 +3098,8 @@ function rollCharacter(availableAncestries, availableBackgrounds, availableClass
   }
 
   if (!chosenArchetype) {
-    chosenArchetype = chooseArchetype(chosenClass, chosenSubclasses, ancestry);
+    // chosenDeity is only set here if Deity is locked.
+    chosenArchetype = chooseArchetype(chosenClass, chosenSubclasses, ancestry, chosenDeity);
   }
 
   if (!chosenRegion) {
@@ -3071,6 +3112,12 @@ function rollCharacter(availableAncestries, availableBackgrounds, availableClass
         ? "No continents are selected for custom region rolling. Choose at least one continent."
         : "No regions are available for the current region settings.",
     };
+  }
+
+  // An archetype with a required deity sets the deity, even when deity
+  // rolling is off.
+  if (!chosenDeity && archetypeRequiredDeities(chosenArchetype).length > 0) {
+    chosenDeity = chooseRequiredDeity(chosenArchetype);
   }
 
   if (!chosenDeity) {

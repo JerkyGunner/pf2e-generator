@@ -323,6 +323,7 @@ Current checks include:
 - allowed traditions
 - required spellcasting style
 - requires focus spells
+- required deity
 
 Then the archetype roll works in two stages:
 
@@ -332,6 +333,11 @@ Then the archetype roll works in two stages:
 If the chosen side is empty, it falls back to the other side.
 
 By default the Class and Other archetype weights are both `1`, which makes it behave like a 50/50 split.
+
+`required_deity` lists the deities an archetype needs, comma-separated and spelled as on the Deities sheet (for example, Midnight Illusionist needs `Zon-Kuthon`):
+
+- if Deity is locked, only archetypes that accept that deity can roll
+- otherwise, at least one required deity must pass the source and access filters, and the deity is then picked from the required list, even when deity rolling is turned off
 
 Subclasses whose key ability is `Archetype` (the Rogue's `Eldritch Trickster` racket) always get a `Class` archetype for a spellcasting class, even when archetype rolling is turned off. That archetype is rolled straight after the subclass, using the normal rarity weighting.
 
@@ -343,6 +349,8 @@ Subclasses whose key ability is `Archetype` (the Rogue's `Eldritch Trickster` ra
 Deity can be turned on or off, but some characters are required to have one.
 
 The generator always forces a deity for characters whose class, background, or subclass has `needs_deity = TRUE`.
+
+An archetype with a `required_deity` also forces a deity, which is picked from that archetype's list (see Archetype).
 
 Current examples include:
 
