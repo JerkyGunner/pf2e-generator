@@ -61,6 +61,8 @@ const regionModeSelect = document.getElementById("regionMode");
 const rarityCommonWeightInput = document.getElementById("rarityCommonWeight");
 const rarityUncommonWeightInput = document.getElementById("rarityUncommonWeight");
 const rarityRareWeightInput = document.getElementById("rarityRareWeight");
+const heritageAncestryWeightInput = document.getElementById("heritageAncestryWeight");
+const heritageVersatileWeightInput = document.getElementById("heritageVersatileWeight");
 const regionInnerSeaWeightInput = document.getElementById("regionInnerSeaWeight");
 const regionOtherWeightInput = document.getElementById("regionOtherWeight");
 const deityInnerSeaWeightInput = document.getElementById("deityInnerSeaWeight");
@@ -85,6 +87,7 @@ const rememberSettingsCheckbox = document.getElementById("rememberSettings");
 const resetDefaultsButton = document.getElementById("resetDefaultsBtn");
 const regionModeHint = document.getElementById("regionModeHint");
 const rarityWeightingGuide = document.getElementById("rarityWeightingGuide");
+const heritageWeightingGuide = document.getElementById("heritageWeightingGuide");
 const startingContinentWeightingGuide = document.getElementById("startingContinentWeightingGuide");
 const regionWeightingGuide = document.getElementById("regionWeightingGuide");
 const deityWeightingGuide = document.getElementById("deityWeightingGuide");
@@ -147,6 +150,8 @@ const defaultGeneratorSettings = {
   rarityCommonWeight: 10,
   rarityUncommonWeight: 3,
   rarityRareWeight: 1,
+  heritageAncestryWeight: 4,
+  heritageVersatileWeight: 1,
   accessFilter: "standard-only",
   regionToggle: "on",
   archetypeToggle: "on",
@@ -305,6 +310,13 @@ function rarityWeights() {
   };
 }
 
+function heritageWeights() {
+  return {
+    ancestry: integerInputValue(heritageAncestryWeightInput, defaultGeneratorSettings.heritageAncestryWeight),
+    versatile: integerInputValue(heritageVersatileWeightInput, defaultGeneratorSettings.heritageVersatileWeight),
+  };
+}
+
 function regionWeights() {
   return {
     innerSea: integerInputValue(regionInnerSeaWeightInput, defaultGeneratorSettings.regionInnerSeaWeight),
@@ -380,6 +392,7 @@ function collectCurrentSettings() {
   const sourceInputs = sourceCheckboxGroups.querySelectorAll("input[type=\"checkbox\"]");
   const regionInputs = regionCheckboxGroups.querySelectorAll("input[type=\"checkbox\"]");
   const currentRarityWeights = rarityWeights();
+  const currentHeritageWeights = heritageWeights();
   const currentRegionWeights = regionWeights();
   const currentDeityWeights = deityWeights();
   const currentArchetypeWeights = archetypeWeights();
@@ -391,6 +404,8 @@ function collectCurrentSettings() {
     rarityCommonWeight: currentRarityWeights.common,
     rarityUncommonWeight: currentRarityWeights.uncommon,
     rarityRareWeight: currentRarityWeights.rare,
+    heritageAncestryWeight: currentHeritageWeights.ancestry,
+    heritageVersatileWeight: currentHeritageWeights.versatile,
     accessFilter: accessFilterSelect.value,
     regionToggle: regionToggleSelect.value,
     archetypeToggle: archetypeToggleSelect.value,
@@ -443,6 +458,8 @@ function applyGeneratorSettings(settings = {}) {
   rarityCommonWeightInput.value = resolvedSettings.rarityCommonWeight;
   rarityUncommonWeightInput.value = resolvedSettings.rarityUncommonWeight;
   rarityRareWeightInput.value = resolvedSettings.rarityRareWeight;
+  heritageAncestryWeightInput.value = resolvedSettings.heritageAncestryWeight;
+  heritageVersatileWeightInput.value = resolvedSettings.heritageVersatileWeight;
   accessFilterSelect.value = resolvedSettings.accessFilter;
   regionToggleSelect.value = resolvedSettings.regionToggle;
   archetypeToggleSelect.value = resolvedSettings.archetypeToggle;
@@ -970,34 +987,63 @@ function chooseArchetype(chosenClass, chosenSubclasses, chosenAncestry) {
     archetype => String(archetype.type).trim().toLowerCase() === "other"
   );
   const currentArchetypeWeights = archetypeWeights();
-  const bucketWeights = [
-    { name: "class", weight: currentArchetypeWeights.classWeight, pool: classArchetypes },
-    { name: "other", weight: currentArchetypeWeights.otherWeight, pool: otherArchetypes },
-  ];
-  const availableBuckets = bucketWeights.filter(bucket => bucket.pool.length > 0);
+
+  return weightedRandomItem(chooseWeightedPool([
+    { weight: currentArchetypeWeights.classWeight, pool: classArchetypes },
+    { weight: currentArchetypeWeights.otherWeight, pool: otherArchetypes },
+  ]));
+}
+
+function chooseWeightedPool(buckets) {
+  // Roll between pools by bucket weight. Empty pools are skipped, so if the
+  // rolled side has nothing valid the other side is used instead.
+  const availableBuckets = buckets.filter(bucket => bucket.pool.length > 0);
   const totalBucketWeight = availableBuckets.reduce((sum, bucket) => sum + bucket.weight, 0);
-  let preferredBucket = null;
+
+  if (availableBuckets.length === 0) {
+    return [];
+  }
 
   if (totalBucketWeight <= 0) {
-    preferredBucket = randomItem(availableBuckets) || null;
-  } else {
-    let remainingWeight = Math.random() * totalBucketWeight;
+    return randomItem(availableBuckets).pool;
+  }
 
-    for (const bucket of availableBuckets) {
-      remainingWeight -= bucket.weight;
+  let remainingWeight = Math.random() * totalBucketWeight;
 
-      if (remainingWeight < 0) {
-        preferredBucket = bucket;
-        break;
-      }
+  for (const bucket of availableBuckets) {
+    remainingWeight -= bucket.weight;
+
+    if (remainingWeight < 0) {
+      return bucket.pool;
     }
   }
 
-  const preferredPool = preferredBucket?.pool || [];
-  const fallbackPool = preferredBucket?.name === "class" ? otherArchetypes : classArchetypes;
-  const finalPool = preferredPool.length > 0 ? preferredPool : fallbackPool;
+  return availableBuckets[availableBuckets.length - 1].pool;
+}
 
-  return weightedRandomItem(finalPool);
+function isVersatileHeritage(heritage) {
+  return String(heritage?.ancestry || "").trim().toLowerCase() === "any";
+}
+
+function chooseHeritage(ancestry) {
+  // Versatile heritages (ancestry "Any") fit every ancestry, so the generator
+  // first rolls Ancestry vs Versatile, then picks inside that pool by rarity.
+  const ancestryName = String(ancestry.name).trim().toLowerCase();
+  const availableHeritages = applyActiveFilters(heritages);
+  const currentHeritageWeights = heritageWeights();
+
+  return weightedRandomItem(chooseWeightedPool([
+    {
+      weight: currentHeritageWeights.ancestry,
+      pool: availableHeritages.filter(
+        heritageOption => String(heritageOption.ancestry).trim().toLowerCase() === ancestryName
+      ),
+    },
+    {
+      weight: currentHeritageWeights.versatile,
+      pool: availableHeritages.filter(isVersatileHeritage),
+    },
+  ]));
 }
 
 function filterClassesForLockedArchetype(classOptions, chosenArchetype) {
@@ -1174,6 +1220,17 @@ function getCurrentRarityWeightingItems() {
   ];
 }
 
+function getCurrentHeritageWeightingItems() {
+  const currentHeritageWeights = heritageWeights();
+
+  return [
+    `The generator first rolls between Ancestry heritages (${currentHeritageWeights.ancestry}) and Versatile heritages (${currentHeritageWeights.versatile}).`,
+    "Versatile heritages, such as Changeling, Nephilim, and Dhampir, can be taken by any ancestry.",
+    "If the chosen side has no valid heritages, it falls back to the other side.",
+    "Inside the final side, the current rarity weighting is used to choose the heritage.",
+  ];
+}
+
 function getCurrentStartingContinentWeightingItems() {
   const startingContinent = selectedStartingContinent();
 
@@ -1331,6 +1388,7 @@ function getCurrentWeaponWeightingItems() {
 
 function updateWeightingGuide() {
   renderWeightingItems(rarityWeightingGuide, getCurrentRarityWeightingItems());
+  renderWeightingItems(heritageWeightingGuide, getCurrentHeritageWeightingItems());
   renderWeightingItems(startingContinentWeightingGuide, getCurrentStartingContinentWeightingItems());
   renderWeightingItems(regionWeightingGuide, getCurrentRegionWeightingItems());
   renderWeightingItems(deityWeightingGuide, getCurrentDeityWeightingItems());
@@ -2685,7 +2743,8 @@ function generateCharacter() {
     ...syncSelectionsFromLockedArchetype(chosenArchetype, chosenClass, ancestry),
   });
 
-  if (!ancestry && heritage) {
+  // A versatile heritage fits any ancestry, so it doesn't pin one down.
+  if (!ancestry && heritage && !isVersatileHeritage(heritage)) {
     ancestry = findAncestryByName(heritage.ancestry) || { name: heritage.ancestry };
   }
 
@@ -2736,14 +2795,9 @@ function generateCharacter() {
     ancestry = weightedRandomItem(availableAncestries);
   }
 
-  // Pick matching heritage
-  const matchingHeritages = applyActiveFilters(heritages).filter(
-    heritageOption => heritageOption.ancestry.toLowerCase() === ancestry.name.toLowerCase()
-  );
+  // Pick heritage from the ancestry's own heritages or the versatile ones
   if (!heritage) {
-    heritage = matchingHeritages.length > 0
-      ? weightedRandomItem(matchingHeritages)
-      : null;
+    heritage = chooseHeritage(ancestry);
   }
 
   // Pick background

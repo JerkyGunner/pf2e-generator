@@ -144,7 +144,7 @@ Some locks are simple. Some are "smart".
 
 Smart lock examples:
 
-- locking `Heritage` also fixes the ancestry it belongs to
+- locking `Heritage` also fixes the ancestry it belongs to (a locked versatile heritage keeps the heritage but lets the ancestry roll freely)
 - locking `Subclasses` also fixes the class they belong to
 - locking `Region` restricts new background rolls to ones that fit that region or its continent
 - locking `Archetype` can force the generator to use a class, ancestry, spellcaster, or focus-spell class that fits it
@@ -176,9 +176,19 @@ If Heritage is locked first, ancestry is pulled from that locked heritage.
 
 ### Heritage
 
-Heritage is always chosen from heritages that match the chosen ancestry.
+Heritage comes from one of two pools:
 
-It still follows the usual rarity, Society access, and source filters.
+- ancestry heritages: heritages listed under the chosen ancestry
+- versatile heritages: heritages listed with the ancestry `Any` (Changeling, Nephilim, Dhampir, and so on), which any ancestry can take
+
+The roll works in two stages:
+
+1. roll between `Ancestry` and `Versatile` using the heritage weights (default 4 and 1, so about 1 in 5 characters gets a versatile heritage)
+2. choose inside that pool using the normal rarity weighting
+
+If the chosen pool is empty under the current filters, it falls back to the other pool.
+
+Both pools still follow the usual rarity, Society access, and source filters.
 
 ### Background
 
@@ -451,6 +461,12 @@ Used for:
 - archetypes
 - weapons
 
+### Heritage type weighting
+
+Used only for:
+
+- the split between ancestry heritages and versatile heritages
+
 ### Region weighting
 
 Used only for:
@@ -491,6 +507,7 @@ The app still provides presets, but users can now edit the numbers directly in `
 Current editable groups are:
 
 - rarity weights
+- heritage Ancestry vs Versatile weights
 - region weights
 - deity bucket weights
 - archetype Class vs Other weights
