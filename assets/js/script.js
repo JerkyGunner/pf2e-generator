@@ -129,7 +129,7 @@ const regionModeOptions = {
   "inner-sea": "Avistan and Garund are favored over the other continents.",
   explore: "Non-Inner Sea continents are favored over Avistan and Garund.",
   balanced: "All continents are treated equally.",
-  custom: "Choose exactly which continents can be rolled, then treat them equally.",
+  custom: "Choose exactly which continents can be rolled. The Inner Sea and Other weights still apply to them.",
 };
 
 const sourcePresetCategories = {
@@ -720,8 +720,17 @@ function splitCsvValues(value) {
     .filter(item => item !== "");
 }
 
+function isRowEnabled(row) {
+  return String(row.enabled ?? "").trim().toLowerCase() !== "false";
+}
+
 function getAvailableRegions() {
-  return regions.filter(region => String(region.name || "").trim() !== "");
+  // Random region rolls skip regions whose "enabled" cell is FALSE. A
+  // background that names a region still uses it (see chooseRegion), and
+  // findRegionByName still finds it so its continent is known.
+  return regions.filter(region =>
+    String(region.name || "").trim() !== "" && isRowEnabled(region)
+  );
 }
 
 function findRegionByName(name) {
@@ -1900,6 +1909,10 @@ async function loadData() {
     knownSourceNames = new Set(
       sourceDefinitions.map(source => normalizeSourceName(source.source_name))
     );
+
+    // A source whose "enabled" cell is FALSE gets no checkbox. Blank counts as
+    // enabled. (Disabled regions are skipped in getAvailableRegions instead.)
+    sourceDefinitions = sourceDefinitions.filter(isRowEnabled);
 
     renderSourceCheckboxes();
     renderRegionCheckboxes();

@@ -58,8 +58,8 @@ Deities are different:
 
 Regions are also different:
 
-- they do not use rarity
-- they do use source and Society access
+- they do not use rarity, Society access, or source filters (the Regions sheet has no columns for them)
+- every region on the sheet can be rolled, unless its `enabled` column is `FALSE` (a blank cell counts as enabled). A background that names a disabled region still uses it, because the background fixes the region rather than rolling it.
 - they are weighted by continent instead
 
 ## Rarity Rules
@@ -100,6 +100,8 @@ The `Source Preset` is a quick way to turn source checkboxes on.
 After that, the checkboxes are the real final rule.
 
 That means manual checkbox changes override the preset.
+
+A source whose `enabled` column on the Sources sheet is `FALSE` doesn't get a checkbox at all, so rows that only list that source never roll. A blank `enabled` cell counts as enabled.
 
 A row is allowed if at least one of its listed sources is currently checked.
 
@@ -301,7 +303,8 @@ Region modes:
 - `Balanced`
   - all continents are equal
 - `Custom`
-  - only checked continents are available, and they are treated equally
+  - only checked continents are available
+  - they still use the current Inner Sea and Other weights (switching to Custom keeps whatever numbers were already set, so set both to the same value to treat them equally)
 
 The continent weighting used by the presets is:
 
