@@ -187,11 +187,6 @@ function randomItem(array) {
   return array[Math.floor(Math.random() * array.length)];
 }
 
-function randomItems(array, count) {
-  const shuffled = [...array].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count);
-}
-
 function cloneValue(value) {
   if (Array.isArray(value)) {
     return value.map(item => ({ ...item }));
@@ -202,10 +197,6 @@ function cloneValue(value) {
   }
 
   return value;
-}
-
-function getCurrentThemeOptionLabel() {
-  return rarityModeSelect.options[rarityModeSelect.selectedIndex]?.textContent || "";
 }
 
 function updateRegionModeHint() {
