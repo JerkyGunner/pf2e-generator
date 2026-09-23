@@ -199,6 +199,33 @@ function cloneValue(value) {
   return value;
 }
 
+// Storage can throw when site data is blocked or unavailable (e.g. some
+// private windows). The app still works then; it just can't remember
+// settings or theme between visits.
+function readStorage(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch (error) {
+    return null;
+  }
+}
+
+function writeStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (error) {
+    console.warn("Could not save to browser storage.", error);
+  }
+}
+
+function removeStorage(key) {
+  try {
+    localStorage.removeItem(key);
+  } catch (error) {
+    console.warn("Could not update browser storage.", error);
+  }
+}
+
 function updateRegionModeHint() {
   regionModeHint.textContent = regionModeOptions[regionModeSelect.value] || "";
 }
@@ -269,7 +296,7 @@ function updateThemeToggle(theme) {
 function initializeTheme() {
   // Save the user's explicit light/dark choice, but if they never picked one,
   // fall back to whatever their device theme is using.
-  const savedTheme = localStorage.getItem(themeStorageKey);
+  const savedTheme = readStorage(themeStorageKey);
   applyTheme(savedTheme || getSystemTheme());
 }
 
@@ -353,21 +380,21 @@ function setRememberSettingsEnabled(enabled, persist = true) {
   rememberSettingsCheckbox.checked = enabled;
 
   if (persist) {
-    localStorage.setItem(rememberSettingsStorageKey, String(enabled));
+    writeStorage(rememberSettingsStorageKey, String(enabled));
   }
 
   if (!enabled) {
-    localStorage.removeItem(settingsStorageKey);
+    removeStorage(settingsStorageKey);
   }
 }
 
 function initializeRememberSettingsPreference() {
-  const savedPreference = localStorage.getItem(rememberSettingsStorageKey);
+  const savedPreference = readStorage(rememberSettingsStorageKey);
   setRememberSettingsEnabled(savedPreference !== "false", false);
 }
 
 function getSavedGeneratorSettings() {
-  const savedSettings = localStorage.getItem(settingsStorageKey);
+  const savedSettings = readStorage(settingsStorageKey);
 
   if (!savedSettings) {
     return null;
@@ -510,7 +537,7 @@ function saveGeneratorSettings() {
     return;
   }
 
-  localStorage.setItem(settingsStorageKey, JSON.stringify(collectCurrentSettings()));
+  writeStorage(settingsStorageKey, JSON.stringify(collectCurrentSettings()));
 }
 
 function resetLockedSelections() {
@@ -3389,7 +3416,7 @@ rememberSettingsCheckbox.addEventListener("change", () => {
 resetDefaultsButton.addEventListener("click", resetGeneratorDefaults);
 themeToggle.addEventListener("click", () => {
   const theme = document.body.dataset.theme === "dark" ? "light" : "dark";
-  localStorage.setItem(themeStorageKey, theme);
+  writeStorage(themeStorageKey, theme);
   applyTheme(theme);
 });
 document.addEventListener("click", event => {
