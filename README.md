@@ -107,6 +107,8 @@ A row is allowed if at least one of its listed sources is currently checked.
 
 This matters because some rows can list more than one source in the workbook.
 
+Source names must match the Sources sheet exactly. That's also how names containing a comma, like `Cheliax, Infernal Inheritance`, are recognised as one source. When the page loads, any row whose source isn't on the Sources sheet, or is blank, is listed in a warning in the browser console (F12). Such a row can never roll.
+
 ## Remembered Settings
 
 The app can remember generator settings between visits.

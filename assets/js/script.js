@@ -648,6 +648,36 @@ function splitSourceValues(value) {
   return results;
 }
 
+function warnAboutUnknownSources(rowsBySheet) {
+  // A source that isn't on the Sources sheet (e.g. a typo, which would also
+  // break up a name containing a comma) never matches a checkbox, so the row
+  // silently never rolls. The same goes for a blank source. List them here.
+  const problems = [];
+
+  Object.entries(rowsBySheet).forEach(([sheetKey, rows]) => {
+    rows.forEach(row => {
+      const rowName = [row.class || row.ancestry, row.name].filter(Boolean).join(" / ") || "(unnamed row)";
+      const label = `${workbookSheets[sheetKey]}: ${rowName}`;
+      const rowSources = splitSourceValues(row.source);
+
+      if (rowSources.length === 0) {
+        problems.push(`${label} has no source`);
+        return;
+      }
+
+      rowSources
+        .filter(source => !knownSourceNames.has(source))
+        .forEach(source => problems.push(`${label} lists "${source}", which isn't on the Sources sheet`));
+    });
+  });
+
+  if (problems.length > 0) {
+    console.warn(
+      `These workbook rows can never roll because of their source:\n- ${problems.join("\n- ")}`
+    );
+  }
+}
+
 function normalizeContinentName(value) {
   return String(value || "").trim();
 }
@@ -1901,6 +1931,17 @@ async function loadData() {
     knownSourceNames = new Set(
       sourceDefinitions.map(source => normalizeSourceName(source.source_name))
     );
+
+    warnAboutUnknownSources({
+      ancestries,
+      heritages,
+      backgrounds,
+      classes,
+      subclasses,
+      archetypes,
+      deities,
+      weapons,
+    });
 
     // A source whose "enabled" cell is FALSE gets no checkbox. Blank counts as
     // enabled. (Disabled regions are skipped in getAvailableRegions instead.)
