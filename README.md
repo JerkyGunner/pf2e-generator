@@ -149,7 +149,18 @@ Smart lock examples:
 - locking `Region` restricts new background rolls to ones that fit that region or its continent
 - locking `Archetype` can force the generator to use a class, ancestry, spellcaster, or focus-spell class that fits it
 
-If two locks directly conflict, the app stops and shows an error instead of making an invalid character.
+Every roll checks each locked card against the rest of the character:
+
+- a locked heritage must belong to the ancestry (versatile heritages fit any ancestry)
+- locked subclasses must belong to the class
+- a locked archetype must meet its requirements (ancestry, class, spellcasting, and so on)
+- a locked key ability must be an option for the class and subclasses
+- a locked deity must be a real deity if the class, background, or a subclass needs one (`None` and `Faiths & Philosophies` entries don't count)
+- a locked favored weapon must still be legal for the class, subclasses, key ability, and deity
+
+If the rolled cards don't fit a lock, the generator rerolls the unlocked cards, up to 200 times, until everything fits. So a locked `Strength` key ability only ends up on classes that can use Strength, and a locked `None` deity never ends up on a Cleric.
+
+If nothing fits, for example because two locks directly conflict, the app stops and shows an error naming the lock instead of making an invalid character.
 
 ## Card-by-Card Rules
 

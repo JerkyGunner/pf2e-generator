@@ -143,6 +143,8 @@ const themeStorageKey = "pf2e-generator-theme";
 const settingsStorageKey = "pf2e-generator-settings";
 const rememberSettingsStorageKey = "pf2e-generator-remember-settings";
 let pendingSettingsToApply = null;
+// How many times to reroll the unlocked cards before giving up on the locks.
+const maxLockAttempts = 200;
 
 const defaultGeneratorSettings = {
   rarityFilter: "all",
@@ -930,46 +932,50 @@ function archetypeAllowsTradition(archetype, spellcastingProfile) {
   return allowedTraditions.some(tradition => spellcastingProfile.traditions.includes(tradition));
 }
 
-function filterArchetypesForCharacter(chosenClass, chosenSubclasses, chosenAncestry) {
+function archetypeFitsCharacter(archetype, chosenClass, chosenSubclasses, chosenAncestry) {
   const spellcastingProfile = getSpellcastingProfile(chosenClass, chosenSubclasses);
   const classFeatureProfile = getClassFeatureProfile(chosenClass);
 
   // This is the "can this archetype legally fit this character?" gate.
   // Every requirement column on the Archetypes sheet is checked here.
-  return applyActiveFilters(archetypes).filter(archetype => {
-    if (String(archetype.name).trim().toLowerCase() === String(chosenClass.name).trim().toLowerCase()) {
-      return false;
-    }
+  if (String(archetype.name).trim().toLowerCase() === String(chosenClass.name).trim().toLowerCase()) {
+    return false;
+  }
 
-    if (isTrueValue(archetype.requires_spellcasting) && !spellcastingProfile.isSpellcaster) {
-      return false;
-    }
+  if (isTrueValue(archetype.requires_spellcasting) && !spellcastingProfile.isSpellcaster) {
+    return false;
+  }
 
-    if (!archetypeAllowsTradition(archetype, spellcastingProfile)) {
-      return false;
-    }
+  if (!archetypeAllowsTradition(archetype, spellcastingProfile)) {
+    return false;
+  }
 
-    if (
-      archetype.required_spellcasting_style &&
-      String(archetype.required_spellcasting_style).trim().toLowerCase() !== spellcastingProfile.style
-    ) {
-      return false;
-    }
+  if (
+    archetype.required_spellcasting_style &&
+    String(archetype.required_spellcasting_style).trim().toLowerCase() !== spellcastingProfile.style
+  ) {
+    return false;
+  }
 
-    if (!matchesOptionalRequirement(archetype.required_class, chosenClass.name)) {
-      return false;
-    }
+  if (!matchesOptionalRequirement(archetype.required_class, chosenClass.name)) {
+    return false;
+  }
 
-    if (!matchesOptionalListRequirement(archetype.required_ancestry, chosenAncestry.name)) {
-      return false;
-    }
+  if (!matchesOptionalListRequirement(archetype.required_ancestry, chosenAncestry.name)) {
+    return false;
+  }
 
-    if (isTrueValue(archetype.requires_focus_spells) && !classFeatureProfile.hasFocusSpells) {
-      return false;
-    }
+  if (isTrueValue(archetype.requires_focus_spells) && !classFeatureProfile.hasFocusSpells) {
+    return false;
+  }
 
-    return true;
-  });
+  return true;
+}
+
+function filterArchetypesForCharacter(chosenClass, chosenSubclasses, chosenAncestry) {
+  return applyActiveFilters(archetypes).filter(archetype =>
+    archetypeFitsCharacter(archetype, chosenClass, chosenSubclasses, chosenAncestry)
+  );
 }
 
 function subclassNeedsCasterArchetype(subclass) {
@@ -2126,20 +2132,33 @@ function chooseWeightedDeityBucket(buckets, requiresDeity = false) {
   return bucketEntries[bucketEntries.length - 1].name;
 }
 
-function chooseDeity(chosenAncestry, chosenRegion, chosenClass, chosenBackground, chosenSubclasses) {
+function chooseDeity(chosenAncestry, chosenRegion, chosenClass, chosenBackground, chosenSubclasses, requiredFavoredWeapon = null) {
   const requiresDeity = characterNeedsDeity(chosenClass, chosenBackground, chosenSubclasses);
 
   if (!isDeityEnabled() && !requiresDeity) {
     return null;
   }
 
-  const availableDeities = applyAccessAndSourceFilters(deities).filter(deity => {
+  let availableDeities = applyAccessAndSourceFilters(deities).filter(deity => {
     if (!requiresDeity) {
       return true;
     }
 
     return !splitDeityCategories(deity.category).includes("Faiths & Philosophies");
   });
+
+  // A locked weapon that is only legal as a required deity's favored weapon
+  // narrows the roll to deities who favor it.
+  if (requiresDeity && requiredFavoredWeapon) {
+    const weaponName = String(requiredFavoredWeapon).trim().toLowerCase();
+    const favoringDeities = availableDeities.filter(deity =>
+      splitCsvValues(deity.favored_weapon).includes(weaponName)
+    );
+
+    if (favoringDeities.length > 0) {
+      availableDeities = favoringDeities;
+    }
+  }
 
   if (availableDeities.length === 0) {
     return requiresDeity ? null : {
@@ -2457,24 +2476,21 @@ function weightedRandomWeapon(weaponPool, chosenClass, chosenDeity, requiresDeit
   return weaponPool[weaponPool.length - 1];
 }
 
+function weaponIsLegalForCharacter(weapon, chosenClass, chosenSubclasses, chosenDeity, requiresDeity, chosenKeyAbility) {
+  // A required deity's favored weapon skips the subclass and key ability
+  // checks, but still has to fit the class's weapon categories and traits.
+  const isRequiredDeityWeapon = requiresDeity && weaponIsDeityFavored(weapon, chosenDeity);
+
+  return weaponMatchesAllowedCategories(weapon, chosenClass, chosenSubclasses, chosenDeity, requiresDeity)
+    && (isRequiredDeityWeapon || weaponMatchesSubclassRequirements(weapon, chosenSubclasses))
+    && weaponMatchesClassTraits(weapon, chosenClass, chosenSubclasses, chosenDeity, requiresDeity)
+    && (isRequiredDeityWeapon || weaponMatchesKeyAbility(weapon, chosenKeyAbility));
+}
+
 function chooseWeapon(chosenClass, chosenDeity, chosenBackground, chosenKeyAbility, chosenSubclasses) {
   const requiresDeity = characterNeedsDeity(chosenClass, chosenBackground, chosenSubclasses);
   let availableWeapons = applyActiveFilters(weapons).filter(weapon =>
-    weaponMatchesAllowedCategories(weapon, chosenClass, chosenSubclasses, chosenDeity, requiresDeity)
-  );
-
-  availableWeapons = availableWeapons.filter(weapon =>
-    (requiresDeity && weaponIsDeityFavored(weapon, chosenDeity))
-      || weaponMatchesSubclassRequirements(weapon, chosenSubclasses)
-  );
-
-  availableWeapons = availableWeapons.filter(weapon =>
-    weaponMatchesClassTraits(weapon, chosenClass, chosenSubclasses, chosenDeity, requiresDeity)
-  );
-
-  availableWeapons = availableWeapons.filter(weapon =>
-    (requiresDeity && weaponIsDeityFavored(weapon, chosenDeity))
-      || weaponMatchesKeyAbility(weapon, chosenKeyAbility)
+    weaponIsLegalForCharacter(weapon, chosenClass, chosenSubclasses, chosenDeity, requiresDeity, chosenKeyAbility)
   );
 
   if (availableWeapons.length === 0) {
@@ -2662,6 +2678,46 @@ function subclassKeyAbilityOptions(subclass, chosenArchetype) {
 }
 
 /**
+ * List every key ability the character could legally have.
+ */
+function keyAbilityOptionsFor(chosenClass, chosenSubclasses, chosenArchetype = null) {
+  const className = String(chosenClass.name || "").toLowerCase().trim();
+
+  // -------------------------------
+  // Special rule: Psychic
+  // Key ability depends on Subconscious Mind (type 2)
+  // -------------------------------
+  if (className === "psychic") {
+    const subconsciousMind = findChosenSubclassByType(chosenSubclasses, "2");
+    const psychicOptions = parseKeyAbilityOptions(subconsciousMind?.key_ability);
+
+    if (psychicOptions.length > 0) {
+      return psychicOptions;
+    }
+  }
+
+  // -------------------------------
+  // Start with the class default options
+  // -------------------------------
+  let keyAbilityOptions = parseKeyAbilityOptions(chosenClass.key_ability);
+
+  // -------------------------------
+  // Special rule: Rogue
+  // Rogue starts with Dexterity, but subclass may add another valid option.
+  // "Archetype" means the key ability of the chosen class archetype.
+  // -------------------------------
+  if (className === "rogue") {
+    const subclassOptions = chosenSubclasses.flatMap(subclass =>
+      subclassKeyAbilityOptions(subclass, chosenArchetype)
+    );
+
+    keyAbilityOptions = uniqueValues([...keyAbilityOptions, ...subclassOptions]);
+  }
+
+  return keyAbilityOptions;
+}
+
+/**
  * Decide the final key ability for the character.
  */
 function chooseKeyAbility(chosenClass, chosenSubclasses, chosenArchetype = null) {
@@ -2685,23 +2741,7 @@ function chooseKeyAbility(chosenClass, chosenSubclasses, chosenArchetype = null)
     }
   }
 
-  // -------------------------------
-  // Start with the class default options
-  // -------------------------------
-  let keyAbilityOptions = parseKeyAbilityOptions(chosenClass.key_ability);
-
-  // -------------------------------
-  // Special rule: Rogue
-  // Rogue starts with Dexterity, but subclass may add another valid option.
-  // "Archetype" means the key ability of the chosen class archetype.
-  // -------------------------------
-  if (className === "rogue") {
-    const subclassOptions = chosenSubclasses.flatMap(subclass =>
-      subclassKeyAbilityOptions(subclass, chosenArchetype)
-    );
-
-    keyAbilityOptions = uniqueValues([...keyAbilityOptions, ...subclassOptions]);
-  }
+  const keyAbilityOptions = keyAbilityOptionsFor(chosenClass, chosenSubclasses, chosenArchetype);
 
   // -------------------------------
   // If the class has no usable key ability data
@@ -2743,34 +2783,143 @@ function chooseKeyAbility(chosenClass, chosenSubclasses, chosenArchetype = null)
 // MAIN CHARACTER GENERATION
 // ===============================
 
-function generateCharacter() {
-  if (generateButton.disabled) {
-    return;
-  }
+function namesMatch(first, second) {
+  return String(first || "").trim().toLowerCase() === String(second || "").trim().toLowerCase();
+}
 
-  // Start by building the legal pools under the current filters. From here on,
-  // every roll should come from these filtered lists or from data tied to them.
-  const availableAncestries = applyActiveFilters(ancestries);
-  const availableBackgrounds = applyActiveFilters(backgrounds);
-  const availableClasses = filterClassesForLockedArchetype(
-    applyActiveFilters(classes),
-    isArchetypeEnabled() ? lockedSelections.archetype : null
+function deityRequirementName(chosenClass, chosenBackground, chosenSubclasses = []) {
+  const requiringCard = [chosenClass, chosenBackground, ...chosenSubclasses].find(
+    card => isTrueValue(card?.needs_deity)
   );
 
-  if (
-    availableAncestries.length === 0 ||
-    availableBackgrounds.length === 0 ||
-    availableClasses.length === 0
-  ) {
-    setStatusMessageText(
-      "No options match the current filters. Try allowing more rarities or access entries.",
-      true
-    );
-    return;
+  return requiringCard?.name || "";
+}
+
+function archetypeRequirementSummary(archetype) {
+  const listText = value => String(value || "")
+    .split(",")
+    .map(item => item.trim())
+    .filter(item => item !== "")
+    .join(" or ");
+  const requirements = [];
+
+  if (archetype.required_class) {
+    requirements.push(`the ${listText(archetype.required_class)} class`);
   }
 
-  setStatusMessageText("");
+  if (archetype.required_ancestry) {
+    requirements.push(`${listText(archetype.required_ancestry)} ancestry`);
+  }
 
+  if (isTrueValue(archetype.requires_spellcasting)) {
+    requirements.push("a spellcasting class");
+  }
+
+  if (archetype.allowed_traditions) {
+    requirements.push(`${listText(archetype.allowed_traditions)} spells`);
+  }
+
+  if (archetype.required_spellcasting_style) {
+    requirements.push(`${listText(archetype.required_spellcasting_style)} spellcasting`);
+  }
+
+  if (isTrueValue(archetype.requires_focus_spells)) {
+    requirements.push("focus spells");
+  }
+
+  return requirements.join(", ");
+}
+
+function findLockConflict(character) {
+  // Check each locked card against the rest of the rolled character. Returns
+  // an error message, or "" when everything fits.
+  const {
+    ancestry,
+    heritage,
+    background,
+    class: chosenClass,
+    subclasses: chosenSubclasses,
+    keyAbility,
+    deity,
+    weapon,
+    archetype,
+  } = character;
+  const unlockHint = "Unlock it or change the other locks.";
+
+  if (
+    lockedSelections.heritage
+    && heritage
+    && !isVersatileHeritage(heritage)
+    && !namesMatch(heritage.ancestry, ancestry.name)
+  ) {
+    return `The locked Heritage (${heritage.name}) is for ${heritage.ancestry}, not ${ancestry.name}. ${unlockHint}`;
+  }
+
+  if (
+    lockedSelections.subclasses
+    && chosenSubclasses.some(subclass => !namesMatch(subclass.class, chosenClass.name))
+  ) {
+    return `The locked Subclasses are for ${chosenSubclasses[0].class}, not ${chosenClass.name}. ${unlockHint}`;
+  }
+
+  if (
+    isArchetypeEnabled()
+    && lockedSelections.archetype
+    && !archetypeFitsCharacter(archetype, chosenClass, chosenSubclasses, ancestry)
+  ) {
+    const requirements = archetypeRequirementSummary(archetype);
+
+    return requirements
+      ? `The locked Archetype (${archetype.name}) needs ${requirements}, so this ${ancestry.name} ${chosenClass.name} can't take it. ${unlockHint}`
+      : `The locked Archetype (${archetype.name}) can't be taken by this ${ancestry.name} ${chosenClass.name}. ${unlockHint}`;
+  }
+
+  if (lockedSelections.keyAbility) {
+    const keyAbilityOptions = keyAbilityOptionsFor(chosenClass, chosenSubclasses, archetype);
+
+    if (keyAbilityOptions.length > 0 && !keyAbilityOptions.includes(keyAbility.value)) {
+      return `The locked Key Ability (${keyAbility.value}) isn't an option for this ${chosenClass.name}, which can use ${keyAbilityOptions.join(" or ")}. ${unlockHint}`;
+    }
+  }
+
+  const deityRequiredBy = deityRequirementName(chosenClass, background, chosenSubclasses);
+
+  if (isDeityEnabled() && lockedSelections.deity && deityRequiredBy) {
+    if (deity.name === "None") {
+      return `The locked Deity (None) doesn't work here: ${deityRequiredBy} needs a deity. ${unlockHint}`;
+    }
+
+    if (splitDeityCategories(deity.category).includes("Faiths & Philosophies")) {
+      return `The locked Deity (${deity.name}) is a Faiths & Philosophies entry, but ${deityRequiredBy} needs a deity. ${unlockHint}`;
+    }
+  }
+
+  if (lockedSelections.weapon) {
+    const weaponRow = weapons.find(option => namesMatch(option.name, weapon.name));
+
+    if (
+      weaponRow
+      && !weaponIsLegalForCharacter(
+        weaponRow,
+        chosenClass,
+        chosenSubclasses,
+        deity,
+        Boolean(deityRequiredBy),
+        keyAbility
+      )
+    ) {
+      const onlyLegalViaDeity = !deityRequiredBy && weaponIsDeityFavored(weaponRow, deity);
+
+      return onlyLegalViaDeity
+        ? `The locked Favored Weapon (${weapon.name}) is only legal for this ${chosenClass.name} as a required deity's favored weapon, and no deity is required here. Lock the card that required the deity, or unlock the weapon.`
+        : `The locked Favored Weapon (${weapon.name}) isn't legal for this ${chosenClass.name} with ${keyAbility.value} as key ability. ${unlockHint}`;
+    }
+  }
+
+  return "";
+}
+
+function rollCharacter(availableAncestries, availableBackgrounds, availableClasses) {
   let ancestry = lockedSelections.ancestry;
   let heritage = lockedSelections.heritage;
   let background = lockedSelections.background;
@@ -2810,33 +2959,27 @@ function generateCharacter() {
     );
 
     if (!manuallyChosenClass) {
-      setStatusMessageText(
-        "The manually chosen class is not available under the current filters. Adjust the filters or choose Random Class.",
-        true
-      );
-      return;
+      return {
+        error: "The manually chosen class is not available under the current filters. Adjust the filters or choose Random Class.",
+      };
     }
 
     if (
       chosenClass
       && String(chosenClass.name).trim().toLowerCase() !== chosenClassName.toLowerCase()
     ) {
-      setStatusMessageText(
-        "The manually chosen class conflicts with another locked or required choice. Unlock the conflicting result or choose Random Class.",
-        true
-      );
-      return;
+      return {
+        error: "The manually chosen class conflicts with another locked or required choice. Unlock the conflicting result or choose Random Class.",
+      };
     }
 
     chosenClass = manuallyChosenClass;
   }
 
   if (background && chosenRegion && !isBackgroundCompatibleWithRegion(background, chosenRegion)) {
-    setStatusMessageText(
-      "The locked Background and locked Region do not match. Unlock one of them to continue.",
-      true
-    );
-    return;
+    return {
+      error: "The locked Background and locked Region do not match. Unlock one of them to continue.",
+    };
   }
 
   // Pick the main character pieces in dependency order so later choices have
@@ -2860,11 +3003,9 @@ function generateCharacter() {
       : availableBackgrounds;
 
     if (compatibleBackgrounds.length === 0) {
-      setStatusMessageText(
-        "No backgrounds match the locked Region and current filters. Unlock Region or allow more options.",
-        true
-      );
-      return;
+      return {
+        error: "No backgrounds match the locked Region and current filters. Unlock Region or allow more options.",
+      };
     }
 
     background = weightedRandomItem(compatibleBackgrounds);
@@ -2893,11 +3034,9 @@ function generateCharacter() {
   // spellcasting class archetype, even when archetype rolling is off.
   if (chosenSubclasses.some(subclassNeedsCasterArchetype)) {
     if (chosenArchetype && !isCasterClassArchetype(chosenArchetype)) {
-      setStatusMessageText(
-        "The locked Subclass needs a spellcasting class archetype, but the locked Archetype is not one. Unlock one of them to continue.",
-        true
-      );
-      return;
+      return {
+        error: "The locked Subclass needs a spellcasting class archetype, but the locked Archetype is not one. Unlock one of them to continue.",
+      };
     }
 
     if (!chosenArchetype) {
@@ -2907,11 +3046,9 @@ function generateCharacter() {
     }
 
     if (!chosenArchetype) {
-      setStatusMessageText(
-        "The locked Subclass needs a spellcasting class archetype, but none match the current filters. Unlock Subclasses or allow more options.",
-        true
-      );
-      return;
+      return {
+        error: "The locked Subclass needs a spellcasting class archetype, but none match the current filters. Unlock Subclasses or allow more options.",
+      };
     }
   }
 
@@ -2929,25 +3066,40 @@ function generateCharacter() {
   }
 
   if (isRegionEnabled() && !chosenRegion) {
-    setStatusMessageText(
-      regionModeSelect.value === "custom"
+    return {
+      error: regionModeSelect.value === "custom"
         ? "No continents are selected for custom region rolling. Choose at least one continent."
         : "No regions are available for the current region settings.",
-      true
-    );
-    return;
+    };
   }
 
   if (!chosenDeity) {
-    chosenDeity = chooseDeity(ancestry, chosenRegion, chosenClass, background, chosenSubclasses);
+    const lockedWeaponRow = chosenWeapon
+      ? weapons.find(option => namesMatch(option.name, chosenWeapon.name))
+      : null;
+    const weaponNeedsDeity = lockedWeaponRow && !weaponIsLegalForCharacter(
+      lockedWeaponRow,
+      chosenClass,
+      chosenSubclasses,
+      null,
+      false,
+      chosenKeyAbility
+    );
+
+    chosenDeity = chooseDeity(
+      ancestry,
+      chosenRegion,
+      chosenClass,
+      background,
+      chosenSubclasses,
+      weaponNeedsDeity ? chosenWeapon.name : null
+    );
   }
 
   if (characterNeedsDeity(chosenClass, background, chosenSubclasses) && !chosenDeity) {
-    setStatusMessageText(
-      "The current filters do not allow a valid deity for this class or background.",
-      true
-    );
-    return;
+    return {
+      error: "The current filters do not allow a valid deity for this class or background.",
+    };
   }
 
   if (!chosenWeapon) {
@@ -2955,12 +3107,87 @@ function generateCharacter() {
   }
 
   if (!chosenWeapon) {
+    return {
+      error: "No weapons match the current class, filters, and source settings.",
+    };
+  }
+
+  return {
+    character: {
+      ancestry,
+      heritage,
+      background,
+      region: chosenRegion,
+      class: chosenClass,
+      keyAbility: chosenKeyAbility,
+      deity: chosenDeity,
+      weapon: chosenWeapon,
+      archetype: chosenArchetype,
+      subclasses: chosenSubclasses,
+    },
+  };
+}
+
+function generateCharacter() {
+  if (generateButton.disabled) {
+    return;
+  }
+
+  // Start by building the legal pools under the current filters. From here on,
+  // every roll should come from these filtered lists or from data tied to them.
+  const availableAncestries = applyActiveFilters(ancestries);
+  const availableBackgrounds = applyActiveFilters(backgrounds);
+  const availableClasses = filterClassesForLockedArchetype(
+    applyActiveFilters(classes),
+    isArchetypeEnabled() ? lockedSelections.archetype : null
+  );
+
+  if (
+    availableAncestries.length === 0 ||
+    availableBackgrounds.length === 0 ||
+    availableClasses.length === 0
+  ) {
     setStatusMessageText(
-      "No weapons match the current class, filters, and source settings.",
+      "No options match the current filters. Try allowing more rarities or access entries.",
       true
     );
     return;
   }
+
+  setStatusMessageText("");
+
+  // Roll everything that isn't locked. If the result clashes with a locked
+  // card (e.g. a locked Strength key ability on a Wizard), reroll the unlocked
+  // cards. Only when nothing fits does the generator stop with an error.
+  let rolledCharacter = null;
+  let failureMessage = "";
+
+  for (let attempt = 0; attempt < maxLockAttempts && !rolledCharacter; attempt++) {
+    const rollResult = rollCharacter(availableAncestries, availableBackgrounds, availableClasses);
+    failureMessage = rollResult.error || findLockConflict(rollResult.character);
+
+    if (!failureMessage) {
+      rolledCharacter = rollResult.character;
+    }
+  }
+
+  if (!rolledCharacter) {
+    setStatusMessageText(failureMessage, true);
+    return;
+  }
+
+  const {
+    ancestry,
+    heritage,
+    background,
+    region: chosenRegion,
+    class: chosenClass,
+    keyAbility: chosenKeyAbility,
+    deity: chosenDeity,
+    weapon: chosenWeapon,
+    archetype: chosenArchetype,
+    subclasses: chosenSubclasses,
+  } = rolledCharacter;
 
   currentCharacter = {
     ancestry: cloneValue(ancestry),
