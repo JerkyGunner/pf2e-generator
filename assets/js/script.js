@@ -466,7 +466,6 @@ function applyGeneratorSettings(settings = {}) {
   regionToggleSelect.value = resolvedSettings.regionToggle;
   archetypeToggleSelect.value = resolvedSettings.archetypeToggle;
   deityToggleSelect.value = resolvedSettings.deityToggle;
-  renderClassChoiceOptions(resolvedSettings.classChoice);
   renderStartingContinentOptions(resolvedSettings.startingContinent);
   regionModeSelect.value = resolvedSettings.regionMode;
   regionInnerSeaWeightInput.value = resolvedSettings.regionInnerSeaWeight;
@@ -497,6 +496,10 @@ function applyGeneratorSettings(settings = {}) {
       applySourcePreset();
     }
   }
+
+  // The class list depends on the ticked sources, so build it only after
+  // they're restored. Otherwise a class from a hand-ticked source is dropped.
+  renderClassChoiceOptions(resolvedSettings.classChoice);
 
   if (regionCheckboxGroups.children.length > 0) {
     if (Array.isArray(resolvedSettings.selectedContinents)) {
